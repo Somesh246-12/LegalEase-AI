@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LegalEase AI - Demystify Legal Documents</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Roboto:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <header class="main-header">
+        <div class="container">
+            <a href="/" class="logo">
+                <img src="{{ url_for('static', filename='favicon.png') }}" alt="LegalEase AI Logo">
+                Legal<span>Ease</span> AI
+            </a>
+        </div>
+    </header>
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>Demystify Legal Jargon with AI ✨</h1>
+                <p>Paste your text or upload a document, and let our AI provide clear, simple explanations in seconds.
+                    Understand your contracts with confidence.</p>
+                <form method="post" enctype="multipart/form-data" id="upload-form">
+                    <div class="input-tabs">
+                        <button type="button" class="tab-button active" data-tab="upload-panel">Upload File</button>
+                        <button type="button" class="tab-button" data-tab="paste-panel">Paste Text</button>
+                    </div>
+                    <div id="upload-panel" class="input-panel active">
+                        <input type="file" name="pdf_file" id="file-input" class="hidden"
+                            accept=".pdf,.txt,.md,.jpg,.jpeg,.png">
+                        <div class="upload-area" id="upload-box">
+                            <div class="upload-icon">📄</div>
+                            <h3>Drag & Drop Your File Here</h3>
+                            <p class="text-secondary">or click to select a file (PDF, TXT, JPG, PNG)</p>
+                        </div>
+                    </div>
+                    <div id="paste-panel" class="input-panel">
+                        <textarea name="legal_text" class="upload-area"
+                            placeholder="Paste your legal text here..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-cta">Simplify Document</button>
+                </form>
+            </div>
+        </section>
+        {% if result %}
+        <section class="main-content container">
+            <div class="split-screen">
+                <div class="text-pane simplified-pane">
+                    <h2>Simplified Explanation</h2>
+                    <div class="ai-result">{{ result | safe }}</div>
+                </div>
+            </div>
+            <footer class="main-footer">
+                <p class="footer-copyright">&copy; 2025 LegalEase AI. Hackathon Project. <br> This is not legal advice.
+                    Always consult a qualified professional.</p>
+            </footer>
+        </section>
+        {% endif %}
+    </main>
+    <script>
+        const tabs = document.querySelectorAll('.tab-button');
+        const panels = document.querySelectorAll('.input-panel');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                panels.forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                const panelId = tab.getAttribute('data-tab');
+                document.getElementById(panelId).classList.add('active');
+            });
+        });
+        const uploadBox = document.getElementById('upload-box');
+        const fileInput = document.getElementById('file-input');
+        if (uploadBox && fileInput) {
+            uploadBox.addEventListener('click', () => { fileInput.click(); });
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    uploadBox.querySelector('h3').textContent = fileInput.files[0].name;
+                    uploadBox.querySelector('p').textContent = 'File selected. Ready to simplify!';
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
