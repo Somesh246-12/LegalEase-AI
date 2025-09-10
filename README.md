@@ -7,7 +7,7 @@ A web application built for the Google Cloud Gen AI Exchange Hackathon that demy
 - **Paste Text:** Directly paste legal clauses or documents for analysis.
 - **Upload PDF:** Upload text-based PDF files for summarization.
 - **AI-Powered Summarization:** Get a clear, simple summary of your document, highlighting key obligations, rights, and potential risks.
-- **Multilingual Support:**Get simplified explainations in various languages, including English, Spanish, French, German, Hindi and Marathi.
+- **Multilingual Support:** Get simplified explanations in various languages, including English, Spanish, French, German, Hindi, and Marathi.
 - **Modern UI:** A clean, responsive, and user-friendly interface.
 
 ## 🛠️ Technology Stack
