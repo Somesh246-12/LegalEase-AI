@@ -78,6 +78,31 @@
         </section>
         {% endif %}
     </main>
+
+    <div class="chat-widget">
+        <div class="chat-label" id="chat-label">
+            Confused? Ask Mr.Ken
+        </div>
+        <button id="chat-toggle-button">
+    <img src="{{ url_for('static', filename='adv.png') }}" alt="AI Chatbot Icon">
+</button>
+        <div class="chat-window" id="chat-window">
+            <div class="chat-header">
+                <h3>Define your query</h3>
+                <button id="chat-close-button">_</button>
+            </div>
+            <div class="chat-body" id="chat-body">
+                <div class="chat-message bot">
+                    Hi! If you found any query in summary, type it below and I'll explain it.
+                </div>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="chat-input" placeholder="Type your query...">
+                <button id="chat-send-button">Send</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const tabs = document.querySelectorAll('.tab-button');
         const panels = document.querySelectorAll('.input-panel');
@@ -101,6 +126,64 @@
                 }
             });
         }
+
+        // --- Chatbot JavaScript ---
+        const chatWindow = document.getElementById('chat-window');
+        const chatToggleButton = document.getElementById('chat-toggle-button');
+        const chatCloseButton = document.getElementById('chat-close-button');
+        const chatInput = document.getElementById('chat-input');
+        const chatSendButton = document.getElementById('chat-send-button');
+        const chatBody = document.getElementById('chat-body');
+
+        // Toggle chat window visibility
+        chatToggleButton.addEventListener('click', () => {
+            chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
+        });
+        chatCloseButton.addEventListener('click', () => {
+            chatWindow.style.display = 'none';
+        });
+
+        // Function to add a message to the chat body
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}`;
+            messageDiv.textContent = text;
+            chatBody.appendChild(messageDiv);
+            chatBody.scrollTop = chatBody.scrollHeight; // Auto-scroll to bottom
+        }
+
+        // Function to handle sending a message
+        async function sendMessage() {
+            const word = chatInput.value.trim();
+            if (word === '') return;
+
+            addMessage(word, 'user');
+            chatInput.value = '';
+
+            // Send the word to the Flask backend
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ word: word }),
+                });
+                const data = await response.json();
+                addMessage(data.definition, 'bot');
+            } catch (error) {
+                addMessage('Sorry, I couldn\'t get a definition right now.', 'bot');
+                console.error('Chat error:', error);
+            }
+        }
+
+        chatSendButton.addEventListener('click', sendMessage);
+        // Allow sending by pressing Enter
+        chatInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
     </script>
 </body>
 

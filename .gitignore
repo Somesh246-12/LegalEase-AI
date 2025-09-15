@@ -9,3 +9,6 @@ __pycache__/
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+# Secret credentials
+credentials.json

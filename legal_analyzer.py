@@ -1,21 +1,20 @@
 import vertexai
 from vertexai.generative_models import GenerativeModel
-import markdown # --- NEW: Import the markdown library ---
+import markdown
+from google.oauth2 import service_account # --- NEW IMPORT ---
 
-PROJECT_ID = "legalease-ai-471416"
+# --- NEW: Define credentials path ---
+CREDENTIALS_FILE = "credentials.json"
+credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
+
+PROJECT_ID = "legalease-ai-471416" 
 LOCATION = "asia-south1"
 
-# --- MODIFIED: Added 'target_language' parameter ---
 def summarize_text(text: str, target_language: str = "English") -> str:
-    """Uses the Gemini model to summarize a piece of legal text in a specified language."""
-
-    # Initialize Vertex AI
-    vertexai.init(project=PROJECT_ID, location=LOCATION)
-
-    # Load the Gemini-1.5-Flash model
+    # --- MODIFIED: Pass credentials directly ---
+    vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
     model = GenerativeModel("gemini-1.5-flash")
 
-    # --- MODIFIED: The prompt now includes the language instruction ---
     prompt = f"""
     You are an expert paralegal AI assistant. Your goal is to simplify complex legal documents for the average person.
     Analyze the following legal clause and provide a simple, easy-to-understand summary.
@@ -30,16 +29,37 @@ def summarize_text(text: str, target_language: str = "English") -> str:
     """
 
     try:
-        # Send the prompt to the model and get the response
         response = model.generate_content(prompt)
-        # --- MODIFIED: Convert the AI's markdown response to HTML ---
         return markdown.markdown(response.text)
     except Exception as e:
         print(f"An error occurred with the AI model: {e}")
         return "Sorry, there was an error processing your request with the AI."
 
+def define_word(word: str) -> str:
+    """Uses the Gemini model to define a word in a conversational manner."""
+    vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
+    model = GenerativeModel("gemini-1.5-flash")
 
-# This is the main part of our script for testing
+    # --- NEW, UPGRADED PROMPT ---
+    prompt = f"""
+    You are LegalEase AI's friendly chatbot assistant, Mr.Ken. Your persona is helpful, clear, and encouraging.
+    
+    A user has asked about a word or phrase. Your task is to respond conversationally.
+
+    - If the user provides a word or legal term, greet them and explain the term in a simple, easy-to-understand way, as if you were talking to a curious teenager.
+    - If the user says "hello", "hi", or a similar greeting, respond with a friendly greeting and briefly introduce yourself.
+    - If the user asks a question that is not a definition, provide a polite and helpful response.
+    
+    Here is the user's input: "{word}"
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        print(f"An error occurred while defining the word: {e}")
+        return "Sorry, I'm having a little trouble right now. Please try again in a moment."
+# ... (rest of your legal_analyzer.py code remains the same) ...
+
 if __name__ == "__main__":
     sample_legal_text = """
     "Confidential Information" means any data or information that is proprietary to the Disclosing Party and not generally known to the public,
@@ -53,14 +73,7 @@ if __name__ == "__main__":
 
     print("Analyzing legal text...")
     print("-" * 30)
-
-    # Call our function to get the summary in Marathi
-    # You can change "Marathi" to "Spanish", "Hindi", etc. to test
     summary = summarize_text(sample_legal_text, target_language="Marathi")
-
-    # Print the result from the AI
     print("AI-Generated Summary (in Marathi):")
-    # Note: The output will be HTML formatted, which might look a bit messy in the terminal
-    # but will render correctly in the browser.
     print(summary)
     print("-" * 30)
