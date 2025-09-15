@@ -5,9 +5,11 @@ A web application built for the Google Cloud Gen AI Exchange Hackathon that demy
 ## 🚀 Features
 
 - **Paste Text:** Directly paste legal clauses or documents for analysis.
-- **Upload PDF:** Upload text-based PDF files for summarization.
+- **Multi-Format Support:** Users can either paste raw text or upload documents, including **PDFs, TXT files, and Images (JPG, PNG)**.
 - **AI-Powered Summarization:** Get a clear, simple summary of your document, highlighting key obligations, rights, and potential risks.
+- **OCR for Images:** Automatically extracts text from uploaded images using the Google Cloud Vision API.
 - **Multilingual Support:** Get simplified explanations in various languages, including English, Spanish, French, German, Hindi, and Marathi.
+- **Interactive Chatbot:** A floating chatbot assistant can provide simple definitions for any confusing words in the summary.
 - **Modern UI:** A clean, responsive, and user-friendly interface.
 
 ## 🛠️ Technology Stack
@@ -18,19 +20,48 @@ A web application built for the Google Cloud Gen AI Exchange Hackathon that demy
 - **AI Services:**
     - **Vertex AI:** For accessing and managing the generative models.
     - **Gemini AI Model:** The core AI engine for text analysis and summarization.
+    - **Google Cloud Vision API:** For OCR
 
-## ⚙️ Setup & Installation
+## How to Run Locally
 
-1.  Clone the repository.
-2.  Create and activate a Python virtual environment.
-3.  Install the required packages:
-    ```bash
-    pip install -r requirements.txt
+To get a local copy up and running, follow these simple steps.
+
+### Prerequisites
+* Python 3.8+
+* Google Cloud SDK (`gcloud`) installed and configured.
+
+### Installation & Setup
+1.  **Clone the repo:**
+    ```sh
+    git clone [https://github.com/YOUR_USERNAME/YOUR_REPOSITORY_NAME.git](https://github.com/YOUR_USERNAME/YOUR_REPOSITORY_NAME.git)
+    cd YOUR_REPOSITORY_NAME
     ```
-4.  Configure your Google Cloud credentials.
-5.  Run the Flask application:
-    ```bash
+2.  **Create and activate a virtual environment:**
+    ```sh
+    python -m venv venv
+    # Windows
+    .\venv\Scripts\activate
+    # macOS / Linux
+    source venv/bin/activate
+    ```
+3.  **Install the required packages:**
+    ```sh
+    pip install Flask google-cloud-aiplatform google-cloud-vision PyPDF2 Markdown
+    ```
+4.  **Set up Google Cloud Credentials:**
+    * Follow the Google Cloud documentation to create a **service account**.
+    * Grant the service account the **`Editor`** role for your project.
+    * Download the JSON key for the service account and save it in your project folder with the name `credentials.json`.
+
+5.  **Secure Your Credentials:**
+    * Create a file named `.gitignore` in your project folder.
+    * Add `credentials.json` to this file to prevent your secret key from being uploaded to GitHub.
+
+6.  **Run the application:**
+    ```sh
     flask run
     ```
 
+
 ---
+> **Disclaimer:** This tool is for informational purposes only and does not constitute legal advice. Always consult with a qualified legal professional for any legal matters.
