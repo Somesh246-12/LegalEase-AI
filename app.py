@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request
-from legal_analyzer import summarize_text, define_word
+from legal_analyzer import summarize_text, get_chatbot_response
 from PyPDF2 import PdfReader
 import os
 from google.cloud import vision
@@ -33,10 +33,12 @@ def extract_text_from_image(file):
 def index():
     html_result = None
     text_to_analyze = ""
+    original_text = ""
 
     if request.method == "POST":
         selected_language = request.form.get("target_language", "English")
         uploaded_file = request.files.get('pdf_file')
+        original_text = text_to_analyze
         
         if uploaded_file and uploaded_file.filename != '':
             try:
@@ -59,8 +61,12 @@ def index():
             except Exception as e:
                 html_result = f"<p style='color: #ff6b6b;'><b>Error:</b> Could not read the file. It may be corrupted or an unsupported format. Details: {e}</p>"
 
+        # If not from file, use pasted text
         if not text_to_analyze and not html_result:
             text_to_analyze = request.form.get("legal_text", "")
+
+        # Ensure original_text mirrors what we will analyze for chat context
+        original_text = text_to_analyze if text_to_analyze else original_text
 
         if text_to_analyze and not html_result:
             try:
@@ -71,17 +77,20 @@ def index():
         elif not text_to_analyze and not html_result:
             html_result = "<p style='color: #ffcc00;'>Please paste text or upload a file to analyze.</p>"
 
-    return render_template("index.html", result=html_result)
+    return render_template("index.html", result=html_result, original_text=original_text)
 
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json()
-    word = data.get("word")
-    if not word:
-        return {"definition": "Please provide a word to define."}, 400
-    
-    definition = define_word(word)
-    return {"definition": definition}
+    history = data.get("history")
+    document_text = data.get("document_text", "")  # NEW: Get document text
+
+    if not history:
+        return {"response": "An error occurred. No history received."}, 400
+
+    # NEW: Pass document_text to the AI function
+    bot_response = get_chatbot_response(history, document_text)
+    return {"response": bot_response}
 
 if __name__ == "__main__":
     app.run(debug=True)
