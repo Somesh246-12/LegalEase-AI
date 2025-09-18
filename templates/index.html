@@ -12,6 +12,7 @@
         href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Roboto:wght@400;500&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -74,12 +75,30 @@
                 <!-- NEW: Risk Analysis Pane -->
                 <div class="text-pane risk-pane">
                     <h2>Risk Analysis</h2>
+                    <div class="risk-actions-top btn-group">
+                        <button type="button" class="btn btn-primary btn-pill"
+                            onclick="window.location.href='/export.csv'">
+                            <span class="btn-icon">⬇️</span>
+                            <span>Export CSV</span>
+                        </button>
+                        <button type="button" class="btn btn-outline btn-pill"
+                            onclick="window.location.href='/export.pdf'">
+                            <span class="btn-icon">🖨️</span>
+                            <span>Export PDF</span>
+                        </button>
+                    </div>
                     <div class="risk-legend">
                         <span class="legend-item risk-high">High</span>
                         <span class="legend-item risk-medium">Medium</span>
                         <span class="legend-item risk-low">Low</span>
                     </div>
                     <div class="risk-result">{{ risk_html | safe }}</div>
+                    <div class="risk-charts two-col">
+                        <div class="chart-card">
+                            <h4>Risks by Severity</h4>
+                            <canvas id="severityChart" height="90"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
             <footer class="main-footer">
@@ -110,6 +129,23 @@
             <div class="chat-footer">
                 <input type="text" id="chat-input" placeholder="Type your query...">
                 <button id="chat-send-button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rewrite Modal -->
+    <div id="rewrite-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Safer Rewrite</h3>
+                <button id="rewrite-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="mode-toggle">
+                    <label><input type="radio" name="rewrite-mode" value="plain" checked> Plain</label>
+                    <label><input type="radio" name="rewrite-mode" value="legalese"> Legalese</label>
+                </div>
+                <pre id="rewrite-output" class="rewrite-output"></pre>
             </div>
         </div>
     </div>
@@ -201,6 +237,109 @@
                 addMessage("Sorry, I couldn't get a response right now.", 'bot');
                 console.error('Chat error:', error);
             }
+        }
+
+        // Charts + Rewrite wiring
+        async function loadRiskData() {
+            try {
+                const res = await fetch('/risks.json');
+                const data = await res.json();
+                const stats = data.stats || { severity: {}, type: {} };
+                const sev = stats.severity || {};
+                const sevCtx = document.getElementById('severityChart');
+                if (sevCtx) {
+                    const donut = new Chart(sevCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['High', 'Medium', 'Low'],
+                            datasets: [{
+                                data: [sev.high || 0, sev.medium || 0, sev.low || 0],
+                                backgroundColor: ['#ff6b6b', '#ffd166', '#06d6a0'],
+                                hoverOffset: 6,
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            cutout: '60%',
+                            plugins: { legend: { position: 'bottom' } }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Charts error', e);
+            }
+        }
+
+        async function requestRewrite(clause, mode) {
+            const languageSel = document.getElementById('target_language');
+            const language = languageSel ? languageSel.value : 'English';
+            const res = await fetch('/rewrite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clause, mode, language })
+            });
+            const data = await res.json();
+            return data.rewrite || 'No rewrite available.';
+        }
+
+        function bindRewriteButtons() {
+            const modal = document.getElementById('rewrite-modal');
+            const out = document.getElementById('rewrite-output');
+            const closeBtn = document.getElementById('rewrite-close');
+            if (closeBtn && modal) closeBtn.onclick = () => { modal.style.display = 'none'; };
+            document.body.addEventListener('click', async (e) => {
+                const btn = e.target.closest('.rewrite-btn');
+                if (!btn) return;
+                const clause = btn.getAttribute('data-clause') || '';
+                const selectedMode = document.querySelector('input[name="rewrite-mode"]:checked');
+                const mode = selectedMode ? selectedMode.value : 'plain';
+                modal.style.display = 'block';
+                out.textContent = 'Generating safer rewrite...';
+                try {
+                    const rewrite = await requestRewrite(clause, mode);
+                    out.textContent = rewrite;
+                } catch (err) {
+                    out.textContent = 'Failed to generate rewrite.';
+                }
+            });
+        }
+
+        function simplifyRiskLanguage() {
+            const MAX = 160;
+            const ellipsis = chr => (chr.length > 0 ? '…' : '');
+            document.querySelectorAll('.risk-item').forEach(item => {
+                ['risk-issue', 'risk-suggestion'].forEach(cls => {
+                    const el = item.querySelector(`.${cls}`);
+                    if (!el) return;
+                    const strong = el.querySelector('b');
+                    const label = strong ? strong.outerHTML : '';
+                    const text = el.innerText.replace(/^.*?:\s*/, '');
+                    if (text.length > MAX) {
+                        const short = text.slice(0, MAX);
+                        const more = document.createElement('a');
+                        more.href = '#';
+                        more.className = 'more-link';
+                        more.textContent = ' More';
+                        const span = document.createElement('span');
+                        span.textContent = short + '…';
+                        el.innerHTML = label;
+                        el.appendChild(span);
+                        el.appendChild(more);
+                        more.addEventListener('click', (evt) => {
+                            evt.preventDefault();
+                            el.innerHTML = label + text;
+                        });
+                    }
+                });
+            });
+        }
+
+        // Initialize when result present (template-driven boolean via string)
+        const hasResult = "{{ '1' if result else '0' }}";
+        if (hasResult === '1') {
+            loadRiskData();
+            bindRewriteButtons();
+            simplifyRiskLanguage();
         }
         if (chatSendButton) {
             chatSendButton.addEventListener('click', sendMessage);

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify, Response, session
 from legal_analyzer import summarize_text, get_chatbot_response
 from PyPDF2 import PdfReader
 import os
@@ -10,7 +10,7 @@ CREDENTIALS_FILE = "credentials.json"
 credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
 
 # --- NEW IMPORTS ---
-from legal_analyzer import analyze_risks, render_risks_html
+from legal_analyzer import analyze_risks, render_risks_html, compute_risk_stats, rewrite_clause, risks_to_csv, risks_to_html, risks_to_pdf_bytes
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -79,6 +79,9 @@ def index():
                 # --- NEW: risk analysis
                 risks = analyze_risks(text_to_analyze, target_language=selected_language)
                 risk_html = render_risks_html(risks, target_language=selected_language)
+                # Store risks in session for charts/exports
+                session['risks'] = risks
+                session['risk_language'] = selected_language
             except Exception as e:
                 html_result = f"<p style='color: #ff6b6b;'><b>Error:</b> Could not connect to the AI service. Details: {e}</p>"
         
@@ -86,6 +89,55 @@ def index():
             html_result = "<p style='color: #ffcc00;'>Please paste text or upload a file to analyze.</p>"
 
     return render_template("index.html", result=html_result, original_text=original_text, risk_html=risk_html)
+
+@app.route("/risks.json", methods=["GET"])
+def risks_json():
+    risks = session.get('risks', [])
+    stats = compute_risk_stats(risks) if risks else {"severity": {}, "type": {}}
+    return jsonify({"risks": risks, "stats": stats})
+
+@app.route("/rewrite", methods=["POST"])
+def rewrite():
+    data = request.get_json(silent=True) or {}
+    clause = data.get("clause", "")
+    mode = data.get("mode", "plain")
+    language = data.get("language", session.get('risk_language', 'English'))
+    if not clause.strip():
+        return jsonify({"error": "No clause provided"}), 400
+    safer = rewrite_clause(clause, target_language=language, mode=mode)
+    return jsonify({"rewrite": safer})
+
+@app.route("/export.csv", methods=["GET"])
+def export_csv():
+    risks = session.get('risks', [])
+    csv_str = risks_to_csv(risks)
+    return Response(
+        csv_str,
+        mimetype='text/csv',
+        headers={"Content-Disposition": "attachment; filename=risks.csv"}
+    )
+
+@app.route("/export.html", methods=["GET"])
+def export_html():
+    risks = session.get('risks', [])
+    language = session.get('risk_language', 'English')
+    html_doc = risks_to_html(risks, target_language=language)
+    return Response(
+        html_doc,
+        mimetype='text/html',
+        headers={"Content-Disposition": "attachment; filename=risks.html"}
+    )
+
+@app.route("/export.pdf", methods=["GET"])
+def export_pdf():
+    risks = session.get('risks', [])
+    language = session.get('risk_language', 'English')
+    pdf_bytes = risks_to_pdf_bytes(risks, target_language=language)
+    return Response(
+        pdf_bytes,
+        mimetype='application/pdf',
+        headers={"Content-Disposition": "attachment; filename=risks.pdf"}
+    )
 
 @app.route("/chat", methods=["POST"])
 def chat():
