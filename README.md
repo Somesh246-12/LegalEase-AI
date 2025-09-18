@@ -11,6 +11,7 @@ A web application built for the Google Cloud Gen AI Exchange Hackathon that demy
 - **Multilingual Support:** Get simplified explanations in various languages, including English, Spanish, French, German, Hindi, and Marathi.
 - **Interactive Chatbot:** A floating chatbot assistant can provide simple definitions for any confusing words in the summary.
 - **Modern UI:** A clean, responsive, and user-friendly interface.
+- **AI-Powered Risk Analysis:** Detects potentially unfavorable clauses, assigns a **Low / Medium / High** severity, and presents **color‑coded** items with practical suggestions. Risk content and labels are localized to the selected language.
 
 ## 🛠️ Technology Stack
 
@@ -62,6 +63,24 @@ To get a local copy up and running, follow these simple steps.
     flask run
     ```
 
+## 🧠 Risk Analysis Overview
+- Located alongside the summary, the **Risk Analysis** pane lists extracted risks as items with:
+  - **Clause**: short quote or heading
+  - **Issue**: what could go wrong
+  - **Severity**: Low / Medium / High (machine‑readable values; color‑coded)
+  - **Suggestion**: practical mitigation or redline idea
+- The selected output language applies to risk text as well (e.g., Marathi labels and content), while severity values remain consistent internally.
+
+### Colors
+- High: red
+- Medium: yellow
+- Low: green
+
+### Tips & Troubleshooting
+- If the risk panel shows “No obvious risks detected”:
+  - Provide more context or a larger portion of the contract.
+  - Ensure `credentials.json` is valid and the Vertex AI model is reachable.
+- If risk items appear misaligned, ensure you’re on the latest build; the app normalizes markdown to avoid stray bullets and extra spacing.
 
 ---
 > **Disclaimer:** This tool is for informational purposes only and does not constitute legal advice. Always consult with a qualified legal professional for any legal matters.

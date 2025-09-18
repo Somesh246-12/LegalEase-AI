@@ -65,10 +65,21 @@
         </section>
         {% if result %}
         <section class="main-content container">
+            <div id="document-context" style="display: none;">{{ original_text | safe }}</div>
             <div class="split-screen">
                 <div class="text-pane simplified-pane">
                     <h2>Simplified Explanation</h2>
                     <div class="ai-result">{{ result | safe }}</div>
+                </div>
+                <!-- NEW: Risk Analysis Pane -->
+                <div class="text-pane risk-pane">
+                    <h2>Risk Analysis</h2>
+                    <div class="risk-legend">
+                        <span class="legend-item risk-high">High</span>
+                        <span class="legend-item risk-medium">Medium</span>
+                        <span class="legend-item risk-low">Low</span>
+                    </div>
+                    <div class="risk-result">{{ risk_html | safe }}</div>
                 </div>
             </div>
             <footer class="main-footer">
@@ -84,8 +95,8 @@
             Confused? Ask Mr.Ken
         </div>
         <button id="chat-toggle-button">
-    <img src="{{ url_for('static', filename='adv.png') }}" alt="AI Chatbot Icon">
-</button>
+            <img src="{{ url_for('static', filename='adv.png') }}" alt="AI Chatbot Icon">
+        </button>
         <div class="chat-window" id="chat-window">
             <div class="chat-header">
                 <h3>Define your query</h3>
@@ -135,16 +146,21 @@
         const chatSendButton = document.getElementById('chat-send-button');
         const chatBody = document.getElementById('chat-body');
 
-        // Toggle chat window visibility
-        chatToggleButton.addEventListener('click', () => {
-            chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
-        });
-        chatCloseButton.addEventListener('click', () => {
-            chatWindow.style.display = 'none';
-        });
+        // Toggle chat window visibility (guarded)
+        if (chatToggleButton && chatWindow) {
+            chatToggleButton.addEventListener('click', () => {
+                chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
+            });
+        }
+        if (chatCloseButton && chatWindow) {
+            chatCloseButton.addEventListener('click', () => {
+                chatWindow.style.display = 'none';
+            });
+        }
 
         // Function to add a message to the chat body
         function addMessage(text, sender) {
+            if (!chatBody) return;
             const messageDiv = document.createElement('div');
             messageDiv.className = `chat-message ${sender}`;
             messageDiv.textContent = text;
@@ -154,36 +170,50 @@
 
         // Function to handle sending a message
         async function sendMessage() {
-            const word = chatInput.value.trim();
-            if (word === '') return;
+            const userInput = chatInput ? chatInput.value.trim() : '';
+            if (userInput === '') return;
 
-            addMessage(word, 'user');
-            chatInput.value = '';
+            addMessage(userInput, 'user');
+            if (chatInput) chatInput.value = '';
 
-            // Send the word to the Flask backend
+            // NEW: Get the document context from the hidden div (guarded)
+            const docCtxEl = document.getElementById('document-context');
+            const documentContext = docCtxEl ? docCtxEl.textContent : '';
+
+            const messages = chatBody ? Array.from(chatBody.querySelectorAll('.chat-message')).map(msg => ({
+                role: msg.classList.contains('user') ? 'user' : 'model',
+                text: msg.textContent,
+            })) : [];
+
+            // Send history AND document context to the backend
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ word: word }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        history: messages,
+                        document_text: documentContext // NEW: Send document text
+                    }),
                 });
                 const data = await response.json();
-                addMessage(data.definition, 'bot');
+                addMessage(data.response, 'bot');
             } catch (error) {
-                addMessage('Sorry, I couldn\'t get a definition right now.', 'bot');
+                addMessage("Sorry, I couldn't get a response right now.", 'bot');
                 console.error('Chat error:', error);
             }
         }
 
-        chatSendButton.addEventListener('click', sendMessage);
+        if (chatSendButton) {
+            chatSendButton.addEventListener('click', sendMessage);
+        }
         // Allow sending by pressing Enter
-        chatInput.addEventListener('keypress', (event) => {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
-        });
+        if (chatInput) {
+            chatInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+        }
     </script>
 </body>
 

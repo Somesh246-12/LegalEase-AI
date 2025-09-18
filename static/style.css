@@ -212,6 +212,120 @@ textarea.upload-area {
     gap: 2rem;
 }
 
+/* NEW: Two-column on larger screens */
+@media (min-width: 992px) {
+    .split-screen {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* NEW: Risk Analysis styles */
+.risk-pane {
+    position: relative;
+}
+
+.risk-legend {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.legend-item {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border: 1px solid var(--border-color);
+}
+
+.risk-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-left: 0;
+}
+
+.risk-item {
+    padding: 0.9rem 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background-color: var(--background-dark);
+}
+
+.risk-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.risk-badge {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+/* Color coding */
+.risk-high {
+    background-color: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+.risk-medium {
+    background-color: rgba(250, 204, 21, 0.15);
+    color: #facc15;
+    border-color: rgba(250, 204, 21, 0.35);
+}
+
+.risk-low {
+    background-color: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.35);
+}
+
+/* Apply color to list items via border/background, and badges inherit text */
+.risk-item.risk-high {
+    border-color: rgba(248, 113, 113, 0.45);
+    background-color: rgba(248, 113, 113, 0.07);
+}
+
+.risk-item.risk-medium {
+    border-color: rgba(250, 204, 21, 0.45);
+    background-color: rgba(250, 204, 21, 0.07);
+}
+
+.risk-item.risk-low {
+    border-color: rgba(52, 211, 153, 0.45);
+    background-color: rgba(52, 211, 153, 0.07);
+}
+
+.risk-body {
+    color: var(--text-primary);
+}
+
+.risk-body .risk-issue,
+.risk-body .risk-suggestion {
+    margin-top: 0.25rem;
+}
+
+.risk-empty {
+    color: var(--text-secondary);
+}
+
+/* Ensure markdown inside risks looks fine */
+.risk-item p {
+    margin: 0.25rem 0;
+}
+
+.risk-item strong {
+    color: var(--text-primary);
+}
+
 .text-pane {
     background-color: var(--background-light);
     border-radius: 15px;
@@ -231,6 +345,25 @@ textarea.upload-area {
     white-space: pre-wrap;
     font-family: var(--font-body);
     line-height: 1.8;
+}
+
+/* NEW: Normalize markdown spacing inside summary */
+.simplified-pane .ai-result p {
+    margin: 0.5rem 0;
+}
+
+.simplified-pane .ai-result ul,
+.simplified-pane .ai-result ol {
+    margin: 0.5rem 1.25rem;
+}
+
+.simplified-pane .ai-result li {
+    margin: 0.25rem 0;
+}
+
+/* Prevent lone bullet markers from appearing due to malformed HTML */
+.simplified-pane .ai-result>li {
+    list-style: none;
 }
 
 .main-footer {
