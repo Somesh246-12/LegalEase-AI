@@ -10,8 +10,10 @@ A web application built for the Google Cloud Gen AI Exchange Hackathon that demy
 - **OCR for Images:** Automatically extracts text from uploaded images using the Google Cloud Vision API.
 - **Multilingual Support:** Get simplified explanations in various languages, including English, Spanish, French, German, Hindi, and Marathi.
 - **Interactive Chatbot:** A floating chatbot assistant can provide simple definitions for any confusing words in the summary.
-- **Modern UI:** A clean, responsive, and user-friendly interface.
 - **AI-Powered Risk Analysis:** Detects potentially unfavorable clauses, assigns a **Low / Medium / High** severity, and presents **color‑coded** items with practical suggestions. Risk content and labels are localized to the selected language.
+- **Risk Visualization Dashboard:** Pie chart view of risk severity distribution for faster decision-making.
+- **Export Options:** Export risk analysis reports to CSV or PDF for collaboration and record-keeping.
+- **Modern UI:** A clean, responsive, and user-friendly interface.
 
 ## 🛠️ Technology Stack
 
@@ -75,6 +77,10 @@ To get a local copy up and running, follow these simple steps.
 - High: red
 - Medium: yellow
 - Low: green
+
+### Extras
+- **Pie Chart Dashboard:** Severity risks visualized for quick insights.
+- **Export:** Save analysis as CSV or PDF for team collaboration.
 
 ### Tips & Troubleshooting
 - If the risk panel shows “No obvious risks detected”:
