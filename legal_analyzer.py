@@ -1,3 +1,4 @@
+import os
 import vertexai
 from vertexai.generative_models import GenerativeModel
 import markdown
@@ -12,29 +13,35 @@ from fpdf import FPDF
 # --- CONFIGURATION ---
 PROJECT_ID = "legalease-ai-471416"
 LOCATION = "asia-south1"
-CREDENTIALS_FILE = "credentials.json"
+CREDENTIALS_FILE = "credentials.json"  # for local dev
 
-# --- MODIFIED: LOAD CREDENTIALS AND INITIALIZE VERTEX AI ONCE ---
+# --- LOAD CREDENTIALS AND INITIALIZE VERTEX AI ---
+credentials = None
+
 try:
-    # Try to load from service account file first
-    credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
-    print("Initialized with service account credentials.")
-except Exception:
+    # 1. Check if GOOGLE_APPLICATION_CREDENTIALS_JSON is set (Render deployment)
+    creds_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+    if creds_json:
+        credentials = service_account.Credentials.from_service_account_info(json.loads(creds_json))
+        print("Initialized with credentials from GOOGLE_APPLICATION_CREDENTIALS_JSON.")
+    else:
+        # 2. Local file fallback
+        credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
+        print("Initialized with local credentials.json.")
+except Exception as e:
     try:
-        # Fallback to Application Default Credentials (ADC)
+        # 3. ADC fallback
         credentials, _ = google_auth_default()
         print("Initialized with Application Default Credentials.")
-    except Exception:
-        # If both fail, set to None
-        credentials = None
-        print("Warning: Could not find credentials. API calls will likely fail.")
+    except Exception as e2:
+        print("Warning: Could not find credentials. API calls will likely fail.", e2)
 
-# Initialize the Vertex AI SDK a single time.
-# The SDK handles 'credentials=None' by using ADC by default.
+# Initialize Vertex AI
 vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
 
 # --- MODEL INSTANTIATION: Define the model once to be reused ---
 model = GenerativeModel("gemini-1.5-flash")
+
 
 
 def analyze_risks(text: str, target_language: str = "English") -> list[dict]:
