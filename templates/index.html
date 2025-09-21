@@ -22,6 +22,10 @@
                 <img src="{{ url_for('static', filename='favicon.png') }}" alt="LegalEase AI Logo">
                 Legal<span>Ease</span> AI
             </a>
+
+            <nav class="main-nav">
+                <a href="#" id="why-legalease-btn">Why LegalEase?</a>
+            </nav>
         </div>
     </header>
     <main>
@@ -133,19 +137,58 @@
         </div>
     </div>
 
-    <!-- Rewrite Modal -->
-    <div id="rewrite-modal" class="modal" style="display:none;">
-        <div class="modal-content">
+
+    <!-- NEW: Documentation Modal -->
+    <div id="docs-modal" class="modal" style="display:none;">
+        <div class="modal-content large">
             <div class="modal-header">
-                <h3>Safer Rewrite</h3>
-                <button id="rewrite-close">×</button>
+                <h3>Why LegalEase AI Matters</h3>
+                <button id="docs-close-btn">×</button>
             </div>
-            <div class="modal-body">
-                <div class="mode-toggle">
-                    <label><input type="radio" name="rewrite-mode" value="plain" checked> Plain</label>
-                    <label><input type="radio" name="rewrite-mode" value="legalese"> Legalese</label>
-                </div>
-                <pre id="rewrite-output" class="rewrite-output"></pre>
+            <div class="modal-body docs-body">
+                <h2>From Confusion to Clarity: Empowering You to Understand the Fine Print</h2>
+                <p>Legal documents govern our lives—from the apartments we rent to the software we use. Yet, they are
+                    often written in dense, intimidating language designed by lawyers, for lawyers. This creates a
+                    significant power imbalance, leaving most people in the dark about the rights they're giving away
+                    and the risks they're accepting.</p>
+
+                <hr>
+
+                <h3>The Danger of Jargon and the Power of Risk Analysis</h3>
+                <p>Signing a contract you don't fully understand is a huge gamble. A single misunderstood clause can
+                    lead to unexpected fees, loss of personal data, or severe limitations on your rights. LegalEase AI
+                    tackles this head-on by not only translating jargon into simple language but by actively searching
+                    for and flagging potential risks. Our AI categorizes these risks—<strong>
+                        <font color="#f87171">High</font>
+                    </strong>, <strong>
+                        <font color="#facc15">Medium</font>
+                    </strong>, and <strong>
+                        <font color="#34d399">Low</font>
+                    </strong>—so you can instantly see which parts of the document demand your full attention.</p>
+
+
+                <hr>
+
+                <h3>How LegalEase AI is Different</h3>
+                <p>While other tools might offer basic summaries, LegalEase AI provides a deeper level of insight that
+                    sets it apart:</p>
+                <ul>
+                    <li><strong>Proactive Risk Detection:</strong> We don't just tell you what the document says; we
+                        tell you what it *means* for you.</li>
+                    <li><strong>Multi-Format Intelligence:</strong> Whether it's a selectable PDF or a scanned image of
+                        a paper contract, our powerful Document AI engine can read and analyze it.</li>
+                    <li><strong>Interactive Learning:</strong> Our document-aware chatbot allows you to ask specific
+                        questions about the text, turning a passive reading experience into an active conversation.</li>
+                    <li><strong>Actionable Suggestions:</strong> For every risk identified, our AI provides practical
+                        suggestions, empowering you to negotiate better terms with confidence.</li>
+                </ul>
+
+                <h3>Who This Helps</h3>
+                <p>LegalEase AI is for anyone who has ever felt overwhelmed by a contract. It's for <strong>freelancers</strong>
+                    reviewing client agreements, <strong>small business owners</strong> signing vendor contracts, <strong>tenants</strong>
+                    navigating lease agreements, and every consumer who wants to be informed before they click "I
+                    Agree." Our mission is to level the playing field and make legal understanding a right, not a
+                    privilege.</p>
             </div>
         </div>
     </div>
@@ -350,6 +393,24 @@
                 if (event.key === 'Enter') {
                     sendMessage();
                 }
+            });
+        }
+
+        // --- Documentation Modal JavaScript ---
+        const docsModal = document.getElementById('docs-modal');
+        const whyLegaleaseBtn = document.getElementById('why-legalease-btn');
+        const docsCloseBtn = document.getElementById('docs-close-btn');
+
+        if (whyLegaleaseBtn) {
+            whyLegaleaseBtn.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent page from jumping to top
+                if (docsModal) docsModal.style.display = 'flex';
+            });
+        }
+
+        if (docsCloseBtn) {
+            docsCloseBtn.addEventListener('click', () => {
+                if (docsModal) docsModal.style.display = 'none';
             });
         }
     </script>
