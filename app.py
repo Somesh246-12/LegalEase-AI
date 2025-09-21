@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request, jsonify, Response, session
 import os
 from google.oauth2 import service_account
-from google.cloud import documentai
+from google.cloud import documentai # --- Keep this import ---
+from google.auth import default as google_auth_default
 
-# Import all necessary functions from your legal analyzer
 from legal_analyzer import (
     summarize_text,
     get_chatbot_response,
@@ -16,48 +16,57 @@ from legal_analyzer import (
     risks_to_pdf_bytes
 )
 
+# --- Smart Credential Loading ---
+# This block makes the app work both locally and when deployed.
+CREDENTIALS_FILE = "credentials.json"
+try:
+    # Tries to find the local credentials.json file
+    credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
+except FileNotFoundError:
+    # If the file is not found (like on Cloud Run), it uses the server's default identity
+    print("credentials.json not found. Using Application Default Credentials.")
+    credentials, _ = google_auth_default()
+except Exception as e:
+    print(f"Error loading credentials: {e}")
+    credentials = None
+# --------------------------------
+
 # --- Configuration ---
-# This file must exist in your project folder
 CREDENTIALS_FILE = "credentials.json"
 credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
-
 PROJECT_ID = "legalease-ai-471416"
-# Make sure this matches the region where you created your processor (us or eu)
-DOCAI_LOCATION = "eu"
-# --- IMPORTANT: PASTE YOUR PROCESSOR ID FROM THE GOOGLE CLOUD CONSOLE HERE ---
-DOCAI_PROCESSOR_ID = "3c22ed109a51b5e9"
-# ----------------------------------------------------------------------------
+# Be sure to use the region you selected (US or Europe)
+DOCAI_LOCATION = "eu" 
+# --- IMPORTANT: PASTE YOUR PROCESSOR ID HERE ---
+DOCAI_PROCESSOR_ID = "3c22ed109a51b5e9" 
+# -----------------------------------------------
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
+# --- REPLACED FUNCTION: This is the simpler version without imageless mode ---
 def process_document_with_docai(file_content, mime_type):
-    """
-    Processes a document (PDF, JPG, PNG) using the Document AI service.
-    This is used for all file uploads to handle both text-based and scanned documents.
-    """
-    # You must specify the api_endpoint if your processor is not in the US
+    """Processes a document (PDF, JPG, PNG) using Document AI."""
     opts = {"api_endpoint": f"{DOCAI_LOCATION}-documentai.googleapis.com"}
     client = documentai.DocumentProcessorServiceClient(client_options=opts, credentials=credentials)
 
     # The full resource name of the processor
     name = client.processor_path(PROJECT_ID, DOCAI_LOCATION, DOCAI_PROCESSOR_ID)
 
-    # Create the document object from the uploaded file content
+    # Create the document object
     raw_document = documentai.RawDocument(content=file_content, mime_type=mime_type)
 
     # Configure the process request
     request = documentai.ProcessRequest(name=name, raw_document=raw_document)
 
-    # Send the request to the Document AI processor
+    # Get the response
     result = client.process_document(request=request)
-    
-    # Return the full extracted text
     return result.document.text
+# ---------------------------------------------------------------------------
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    """Handles the main page load and form submission."""
     html_result = None
     original_text = ""
     risk_html = None
@@ -65,50 +74,39 @@ def index():
     if request.method == "POST":
         selected_language = request.form.get("target_language", "English")
         text_to_analyze = ""
-
-        # Get inputs from the form
         uploaded_file = request.files.get('pdf_file')
         pasted_text = request.form.get("legal_text", "")
 
         try:
-            # Priority 1: Handle file upload
             if uploaded_file and uploaded_file.filename != '':
                 file_content = uploaded_file.read()
                 mime_type = uploaded_file.mimetype
                 text_to_analyze = process_document_with_docai(file_content, mime_type)
-            # Priority 2: Handle pasted text
             elif pasted_text:
                 text_to_analyze = pasted_text
             
-            # Store the extracted text for the chatbot context
             original_text = text_to_analyze
 
             if text_to_analyze:
-                # Perform AI analysis only if text was found
                 html_result = summarize_text(text_to_analyze, target_language=selected_language)
                 risks = analyze_risks(text_to_analyze, target_language=selected_language)
                 risk_html = render_risks_html(risks, target_language=selected_language)
-                
-                # Store results in the session for export endpoints
                 session['risks'] = risks
                 session['risk_language'] = selected_language
             else:
                  html_result = "<p style='color: #ffcc00;'>Please paste text or upload a file to analyze.</p>"
 
         except Exception as e:
-            # General error handling for processing issues
             html_result = f"<p style='color: #ff6b6b;'><b>Error:</b> Could not process the document. Details: {e}</p>"
 
-    # Render the page with the results
     return render_template("index.html", result=html_result, original_text=original_text, risk_html=risk_html)
 
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    """Endpoint for the document-aware chatbot."""
     data = request.get_json()
     history = data.get("history")
-    document_text = data.get("document_text", "") 
+    document_text = data.get("document_text", "")
 
     if not history:
         return {"response": "An error occurred. No history received."}, 400
@@ -116,7 +114,6 @@ def chat():
     bot_response = get_chatbot_response(history, document_text)
     return {"response": bot_response}
 
-# --- All other routes for charts and exports ---
 @app.route("/risks.json")
 def risks_json():
     risks = session.get('risks', [])
@@ -168,3 +165,5 @@ def export_pdf():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+

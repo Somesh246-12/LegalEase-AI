@@ -848,3 +848,90 @@ textarea.upload-area {
     font-weight: bold;
     cursor: pointer;
 }
+
+/* ==========================================================================
+   --- Modal Styles (For Documentation and Rewrite Pop-ups) ---
+   ========================================================================== */
+
+/* This is the dark, full-screen background overlay */
+.modal {
+    position: fixed;
+    inset: 0; /* This is a shortcut for top: 0; right: 0; bottom: 0; left: 0; */
+    background: rgba(18, 24, 41, 0.7); /* Dark semi-transparent background */
+    backdrop-filter: blur(8px);
+
+    /* This is the key part that centers the content */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    z-index: 9999; /* Ensures it's on top of everything */
+    padding: 20px; /* Prevents content from touching screen edges on mobile */
+}
+
+/* This is the white panel that holds the content */
+.modal-content {
+    width: min(720px, 94vw); /* Max width of 720px, but shrinks on small screens */
+    background: #202531;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Modifier for the wider documentation modal */
+.modal-content.large {
+    width: min(900px, 94vw);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+#rewrite-close,
+#docs-close-btn {
+    background: transparent;
+    border: 0;
+    color: var(--text-secondary);
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}
+
+.modal-body {
+    padding: 18px;
+    overflow-y: auto; /* Allows content to scroll if it's too long */
+}
+
+/* Specific styles for the rewrite modal content */
+.mode-toggle {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.rewrite-output {
+    background: var(--background-dark);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 12px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 150px;
+}
