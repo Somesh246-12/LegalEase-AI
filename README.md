@@ -19,10 +19,44 @@ A web application built for the Google Cloud Gen AI Exchange Hackathon that demy
 
 ---
 
+## 🧠 Risk Analysis Overview
+
+- Located alongside the summary, the **Risk Analysis** pane lists extracted risks as items with:
+
+  - **Clause**: short quote or heading
+
+  - **Issue**: what could go wrong
+
+  - **Severity**: Low / Medium / High (machine‑readable values; color‑coded)
+
+  - **Suggestion**: practical mitigation or redline idea
+
+- The selected output language applies to risk text as well (e.g., Marathi labels and content), while severity values remain consistent internally.
+
+### Colors
+
+- High: red
+
+- Medium: yellow
+
+- Low: green
+
+### Tips & Troubleshooting
+
+- If the risk panel shows “No obvious risks detected”:
+
+  - Provide more context or a larger portion of the contract.
+
+  - Ensure `credentials.json` is valid and the Vertex AI model is reachable.
+
+- If risk items appear misaligned, ensure you’re on the latest build; the app normalizes markdown to avoid stray bullets and extra spacing.
+
+---
+
 ## 🛠️ Technology Stack
 
 -   **Backend:** Python, Flask
--   **Frontend:** HTML, CSS
+-   **Frontend:** HTML, CSS, JavaScript
 -   **Cloud Platform:** Google Cloud
 -   **AI Services:**
     -   **Vertex AI:** For accessing and managing the generative models.
@@ -83,3 +117,4 @@ To get a local copy up and running, follow these simple steps.
 ---
 
 > **Disclaimer:** This tool is for informational purposes only and does not constitute legal advice. Always consult with a qualified legal professional for any legal matters.
+
