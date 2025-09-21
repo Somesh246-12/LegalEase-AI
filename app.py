@@ -1,8 +1,9 @@
 from flask import Flask, render_template, request, jsonify, Response, session
 import os
+import json
 from google.oauth2 import service_account
-from google.cloud import documentai # --- Keep this import ---
 from google.auth import default as google_auth_default
+from google.cloud import documentai
 
 from legal_analyzer import (
     summarize_text,
@@ -16,54 +17,63 @@ from legal_analyzer import (
     risks_to_pdf_bytes
 )
 
-# --- Smart Credential Loading ---
-# This block makes the app work both locally and when deployed.
-CREDENTIALS_FILE = "credentials.json"
-try:
-    # Tries to find the local credentials.json file
-    credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
-except FileNotFoundError:
-    # If the file is not found (like on Cloud Run), it uses the server's default identity
-    print("credentials.json not found. Using Application Default Credentials.")
-    credentials, _ = google_auth_default()
-except Exception as e:
-    print(f"Error loading credentials: {e}")
-    credentials = None
-# --------------------------------
+# --- NEW, MORE ROBUST CREDENTIALS LOGIC ---
+# This new section can handle credentials from a local file OR a secure environment variable.
+credentials = None
+
+# 1. First, try to load credentials from the environment variable (for Render)
+creds_json_str = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+if creds_json_str:
+    try:
+        creds_info = json.loads(creds_json_str)
+        credentials = service_account.Credentials.from_service_account_info(creds_info)
+        print("Successfully loaded credentials from environment variable.")
+    except Exception as e:
+        print(f"Error loading credentials from environment variable: {e}")
+
+# 2. If that fails, try loading from the local credentials.json file (for local development)
+if not credentials:
+    try:
+        credentials = service_account.Credentials.from_service_account_file("credentials.json")
+        print("Successfully loaded credentials from local file.")
+    except Exception:
+        pass
+
+# 3. As a final fallback, try Application Default Credentials (for Google Cloud Run)
+if not credentials:
+    try:
+        credentials, _ = google_auth_default()
+        print("Successfully loaded credentials using Application Default Credentials.")
+    except Exception:
+        print("Could not load credentials from any source.")
+# --------------------------------------------------------------------------
+
 
 # --- Configuration ---
-CREDENTIALS_FILE = "credentials.json"
-credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
 PROJECT_ID = "legalease-ai-471416"
-# Be sure to use the region you selected (US or Europe)
-DOCAI_LOCATION = "eu" 
-# --- IMPORTANT: PASTE YOUR PROCESSOR ID HERE ---
-DOCAI_PROCESSOR_ID = "3c22ed109a51b5e9" 
+DOCAI_LOCATION = "eu"
+DOCAI_PROCESSOR_ID = "3c22ed109a51b5e9" # Make sure this is your Document OCR Processor ID
 # -----------------------------------------------
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# --- REPLACED FUNCTION: This is the simpler version without imageless mode ---
 def process_document_with_docai(file_content, mime_type):
-    """Processes a document (PDF, JPG, PNG) using Document AI."""
+    """Processes a document using Document AI."""
     opts = {"api_endpoint": f"{DOCAI_LOCATION}-documentai.googleapis.com"}
     client = documentai.DocumentProcessorServiceClient(client_options=opts, credentials=credentials)
-
-    # The full resource name of the processor
     name = client.processor_path(PROJECT_ID, DOCAI_LOCATION, DOCAI_PROCESSOR_ID)
-
-    # Create the document object
     raw_document = documentai.RawDocument(content=file_content, mime_type=mime_type)
-
-    # Configure the process request
-    request = documentai.ProcessRequest(name=name, raw_document=raw_document)
-
-    # Get the response
+    
+    # --- The imageless mode logic has been removed from this section ---
+    request = documentai.ProcessRequest(
+        name=name,
+        raw_document=raw_document,
+    )
     result = client.process_document(request=request)
     return result.document.text
-# ---------------------------------------------------------------------------
 
+# ... (The rest of your app.py file is the same) ...
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -165,5 +175,4 @@ def export_pdf():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
 
