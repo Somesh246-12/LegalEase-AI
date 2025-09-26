@@ -40,7 +40,7 @@ except Exception as e:
 vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
 
 # --- MODEL INSTANTIATION: Define the model once to be reused ---
-model = GenerativeModel("gemini-1.5-flash")
+model = GenerativeModel("gemini-2.5-flash")
 
 
 
