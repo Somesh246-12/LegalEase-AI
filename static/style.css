@@ -924,6 +924,15 @@ textarea.upload-area {
     /* Allows content to scroll if it's too long */
 }
 
+#authenticity-modal .modal-body {
+    /* Sets a maximum height relative to the screen height */
+    max-height: 60vh;
+
+    /* Adds a vertical scrollbar ONLY if the content overflows */
+    overflow-y: auto;
+    text-align: left;
+}
+
 /* Specific styles for the rewrite modal content */
 .mode-toggle {
     display: flex;
@@ -1061,4 +1070,79 @@ textarea.upload-area {
     content: '−';
     /* A minus sign */
     transform: translateY(-50%) rotate(180deg);
+}
+
+
+/* --- NEW: Authenticity Modal Styles --- */
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    padding: 1rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid var(--border-color);
+}
+
+#auth-summary {
+    font-size: 1.1rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: var(--text-primary);
+}
+
+.auth-summary {
+    color: var(--text-secondary); /* Uses your existing theme's secondary text color */
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.modal-disclaimer {
+    color: #7d89a8;      /* A darker, less prominent color */
+    margin-top: 2rem;    /* Adds significant space above it */
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+
+
+#auth-findings-list {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 1.5rem;
+}
+
+#auth-findings-list li {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-left: 4px solid #f87171; /* Red for high risk */
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+}
+
+#auth-findings-list li strong {
+    color: var(--text-primary);
+}
+
+/* --- NEW: Center the Verdict Tag --- */
+.verdict-container {
+    text-align: center;
+}
+
+.auth-verdict {
+    display: inline-block;  /* Ensures the background fits the text content */
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;   /* Creates the pill shape */
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;    /* Adds space below the verdict tag */
+    color: #ffffff;         /* Ensures text is white for contrast */
+}
+.verdict-FAKE {
+    background-color: #f87171; /* Red */
+}
+.verdict-SUSPICIOUS {
+    background-color: #facc15; /* Yellow */
+}
+.verdict-REAL {
+    background-color: #34d399; /* Green */
 }

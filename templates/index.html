@@ -67,7 +67,7 @@
 
                     <div id="loader" class="loader-overlay" style="display: none;">
                         <div class="loader-spinner"></div>
-                        <p>Analyzing your document... This may take a moment.</p>
+                        <p id="loader-text">Analyzing your document... This may take a moment.</p>
                     </div>
 
                     <button type="submit" class="btn-cta">Simplify Document</button>
@@ -205,6 +205,26 @@
                     navigating lease agreements, and every consumer who wants to be informed before they click "I
                     Agree." Our mission is to level the playing field and make legal understanding a right, not a
                     privilege.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="authenticity-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Document Authenticity Check</h3>
+            </div>
+            <div class="modal-body">
+                <div class="verdict-container">
+                    <div id="auth-verdict" class="auth-verdict"></div>
+                </div>
+            
+                <p id="auth-summary" class="auth-summary"></p>
+                <p class="modal-disclaimer">This is an automated check and not a guarantee of legal validity.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="auth-cancel-btn" class="btn btn-outline">Cancel</button>
+                <button id="auth-continue-btn" class="btn btn-primary">Continue with Analysis</button>
             </div>
         </div>
     </div>

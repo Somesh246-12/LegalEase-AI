@@ -388,7 +388,8 @@ def get_chatbot_response(history: list, document_text: str) -> str:
     AI: """
     try:
         response = model.generate_content(prompt)
-        return response.text.strip()
+        html_response = markdown.markdown(response.text.strip())
+        return html_response
     except Exception as e:
         print(f"An error occurred in the chatbot: {e}")
         return "Sorry, I'm having a little trouble right now. Please try again in a moment."
@@ -427,6 +428,76 @@ def is_legal_document(text: str) -> bool:
         # If classification fails, assume it's legal to proceed without interruption.
         return True
 
+
+def check_document_authenticity(text: str) -> dict:
+    """
+    Performs a more accurate, reasoning-based authenticity check.
+    """
+    text_snippet = text[:15000] # Use a slightly larger snippet for more context
+
+    prompt = f"""
+You are a highly specialized forensic document examiner and authenticity classifier.
+Your goal is to determine whether the given document is **REAL (authentic)**, **SUSPICIOUS (partially authentic)**, or **FAKE (fabricated or AI-generated)** based on forensic, linguistic, and structural cues.
+
+Carefully analyze the document according to the following six forensic indicators:
+1. **Consistency & Coherence** — Logical flow, factual consistency, natural transitions, and stable tone.
+2. **Language Authenticity** — Domain-appropriate vocabulary and realistic human phrasing; detect templated or AI-style wording.
+3. **Formatting & Metadata Patterns** — Presence of headers, sections, stamps, references, or official formatting.
+4. **Content Credibility** — Specific, verifiable details (names, locations, laws, institutions) vs. vague placeholders.
+5. **Forgery or Manipulation Signs** — Contradictions, unrealistic claims, missing mandatory clauses, or irregular spacing.
+6. **Purpose Alignment** — Whether the tone, structure, and language match the document’s claimed purpose (e.g., legal, academic, certificate, or report).
+
+Now classify the document strictly as follows:
+
+- **FAKE** (Red):  
+  - Over 3 indicators show major flaws or contradictions.  
+  - The text feels AI-generated, generic, or inconsistent with real-world documents.  
+  - Contains fabricated data, placeholders, or implausible claims.  
+  - Confidence typically **below 45**.
+
+- **SUSPICIOUS** (Yellow):  
+  - 1–3 indicators show moderate issues.  
+  - Some parts seem realistic but others look incomplete, inconsistent, or edited.  
+  - Confidence typically **between 45–75**.
+
+- **REAL** (Green):  
+  - No major flaws in any indicator.  
+  - Language, structure, and tone are coherent, credible, and realistic.  
+  - Confidence typically **above 75**.
+
+⚠️ Important:
+Be **conservative** — if any doubt exists, downgrade the verdict to "SUSPICIOUS" or "FAKE" rather than "REAL".
+
+Return a STRICT JSON object using this format (no markdown, no extra text):
+
+{{
+  "verdict": "REAL | SUSPICIOUS | FAKE",
+  "summary": "A concise 1–2 sentence explanation of your reasoning.",
+  "confidence_score": <integer 0–100>,
+  "score_breakdown": {{
+    "authenticity_score": <0–100>,
+    "consistency_score": <0–100>,
+    "credibility_score": <0–100>
+  }}
+}}
+
+---
+DOCUMENT:
+{text[:15000]}
+---
+"""
+
+    try:
+        generation_config = {"temperature": 0.0, "response_mime_type": "application/json"}
+        response = model.generate_content(prompt, generation_config=generation_config)
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"Authenticity check failed: {e}")
+        return {
+            "verdict": "Caution Advised",
+            "reasoning": "The automated analysis could not be completed, so proceed with caution.",
+            "key_finding": "AI analysis tool failed."
+        }
 
 if __name__ == "__main__":
     sample_legal_text = """

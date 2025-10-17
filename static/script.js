@@ -32,10 +32,85 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('upload-form');
     const loader = document.getElementById('loader');
     if (uploadForm && loader) {
-        uploadForm.addEventListener('submit', () => {
+        uploadForm.addEventListener('submit', async (event) => {
+            // 1. Prevent the form from submitting immediately
+            event.preventDefault();
+    
+            // 2. Show the main loader while we run the check
             loader.style.display = 'flex';
+    
+            // 3. Send the form data to our new authenticity endpoint
+            try {
+                const formData = new FormData(uploadForm);
+                const response = await fetch('/check-authenticity', {
+                    method: 'POST',
+                    body: formData,
+                });
+    
+                if (!response.ok) {
+                    throw new Error('Server error during authenticity check.');
+                }
+    
+                const report = await response.json();
+    
+                // 4. Hide the loader and show the modal with the results
+                loader.style.display = 'none';
+                displayAuthenticityModal(report);
+    
+            } catch (error) {
+                console.error("Authenticity check failed:", error);
+                loader.style.display = 'none';
+                alert("Could not perform the authenticity check. Please try again.");
+            }
         });
     }
+    
+    // In your static/script.js file
+
+// In your static/script.js file
+
+function displayAuthenticityModal(report) {
+    const modal = document.getElementById('authenticity-modal');
+    const verdictEl = document.getElementById('auth-verdict');
+    const summaryEl = document.getElementById('auth-summary');
+    
+    // --- Populate the content ---
+    verdictEl.textContent = report.verdict;
+    summaryEl.textContent = report.summary;
+
+    // --- NEW: Add a class for CSS highlighting ---
+    // First, remove any classes from a previous analysis
+    verdictEl.classList.remove('verdict-FAKE', 'verdict-SUSPICIOUS', 'verdict-REAL');
+    // Then, add the correct class based on the new verdict
+    if (report.verdict) {
+        verdictEl.classList.add(`verdict-${report.verdict}`);
+    }
+
+    // Show the modal
+    modal.style.display = 'flex';
+
+    // --- Button handler logic (this part remains the same) ---
+    const uploadForm = document.getElementById('upload-form');
+    const continueBtn = document.getElementById('auth-continue-btn');
+    const cancelBtn = document.getElementById('auth-cancel-btn');
+
+    const continueHandler = () => {
+        modal.style.display = 'none';
+        uploadForm.submit();
+    };
+
+    const cancelHandler = () => {
+        modal.style.display = 'none';
+    };
+    
+    const newContinueBtn = continueBtn.cloneNode(true);
+    continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+    newContinueBtn.addEventListener('click', continueHandler);
+
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    newCancelBtn.addEventListener('click', cancelHandler);
+}
 
     // --- 4. Chatbot Widget Functionality ---
     const chatWindow = document.getElementById('chat-window');
@@ -60,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!chatBody) return;
         const messageDiv = document.createElement('div');
         messageDiv.className = `chat-message ${sender}`;
-        messageDiv.textContent = text;
+        messageDiv.innerHTML = text;
         chatBody.appendChild(messageDiv);
         chatBody.scrollTop = chatBody.scrollHeight;
     }

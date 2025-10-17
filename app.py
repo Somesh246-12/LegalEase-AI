@@ -15,7 +15,8 @@ from legal_analyzer import (
     risks_to_csv,
     risks_to_html,
     risks_to_pdf_bytes,
-    is_legal_document  # pyright: ignore[reportUnusedImport]
+    is_legal_document,  # pyright: ignore[reportUnusedImport]
+    check_document_authenticity
 )
 
 # --- NEW, MORE ROBUST CREDENTIALS LOGIC ---
@@ -178,6 +179,36 @@ def export_pdf():
         headers={"Content-Disposition": "attachment; filename=risks.pdf"}
     )
 
+
+@app.route("/check-authenticity", methods=["POST"])
+def check_authenticity():
+    """
+    A new endpoint that only performs the authenticity check.
+    """
+    text_to_analyze = ""
+    uploaded_file = request.files.get('pdf_file')
+    pasted_text = request.form.get("legal_text", "")
+
+    try:
+        if uploaded_file and uploaded_file.filename != '':
+            file_content = uploaded_file.read()
+            mime_type = uploaded_file.mimetype
+            text_to_analyze = process_document_with_docai(file_content, mime_type)
+        elif pasted_text:
+            text_to_analyze = pasted_text
+
+        if text_to_analyze:
+            report = check_document_authenticity(text_to_analyze)
+            return jsonify(report)
+        else:
+            # If no text, return a generic "safe" report to avoid blocking the user
+            return jsonify({ "confidence_score": 100, "summary": "No text provided.", "findings": [] })
+
+    except Exception as e:
+        print(f"Error in authenticity check endpoint: {e}")
+        return jsonify({"error": "Failed to process document for authenticity check."}), 500
+
+        
 if __name__ == "__main__":
     app.run(debug=True)
 
