@@ -17,7 +17,8 @@ from legal_analyzer import (
     risks_to_html,
     risks_to_pdf_bytes,
     is_legal_document,  # pyright: ignore[reportUnusedImport]
-    check_document_authenticity
+    check_document_authenticity,
+    check_page_limit
 )
 
 # --- NEW, MORE ROBUST CREDENTIALS LOGIC ---
@@ -97,6 +98,13 @@ def index():
             if uploaded_file and uploaded_file.filename != '':
                 file_content = uploaded_file.read()
                 mime_type = uploaded_file.mimetype
+                
+                # Check page limit first
+                page_limit_result = check_page_limit(file_content, mime_type)
+                if page_limit_result['exceeds_limit']:
+                    warning_message = f"📄 {page_limit_result['message']} {page_limit_result['recommendation']}"
+                    return render_template("index.html", result=None, original_text="", risk_html=None, warning_message=warning_message)
+                
                 text_to_analyze = process_document_with_docai(file_content, mime_type)
             elif pasted_text:
                 text_to_analyze = pasted_text
@@ -208,6 +216,17 @@ def check_authenticity():
         if uploaded_file and uploaded_file.filename != '':
             file_content = uploaded_file.read()
             mime_type = uploaded_file.mimetype
+            
+            # Check page limit first
+            page_limit_result = check_page_limit(file_content, mime_type)
+            if page_limit_result['exceeds_limit']:
+                return jsonify({
+                    "verdict": "PAGE_LIMIT_EXCEEDED",
+                    "summary": page_limit_result['message'],
+                    "confidence_score": 100,
+                    "page_details": page_limit_result
+                })
+            
             text_to_analyze = process_document_with_docai(file_content, mime_type)
         elif pasted_text:
             text_to_analyze = pasted_text

@@ -36,7 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. Prevent the form from submitting immediately
             event.preventDefault();
     
-            // 2. Show the main loader while we run the check
+            // 2. Show the main loader with authentication message
+            const loaderText = document.getElementById('loader-text');
+            loaderText.textContent = 'Authenticating your document...';
             loader.style.display = 'flex';
     
             // 3. Send the form data to our new authenticity endpoint
@@ -56,9 +58,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 4. Hide the loader and show the modal with the results
                 loader.style.display = 'none';
                 
-                // Check if the document is blurred
-                if (report.verdict === 'BLURRED') {
-                    displayBlurModal(report);
+                // Check if the document exceeds page limit
+                if (report.verdict === 'PAGE_LIMIT_EXCEEDED') {
+                    displayPageLimitModal(report);
                 } else {
                     displayAuthenticityModal(report);
                 }
@@ -102,6 +104,13 @@ function displayAuthenticityModal(report) {
 
     const continueHandler = () => {
         modal.style.display = 'none';
+        
+        // Show loader with analysis message
+        const loaderText = document.getElementById('loader-text');
+        loaderText.textContent = 'Analyzing your document... This may take a moment.';
+        loader.style.display = 'flex';
+        
+        // Submit the form for actual analysis
         uploadForm.submit();
     };
 
@@ -118,7 +127,7 @@ function displayAuthenticityModal(report) {
     newCancelBtn.addEventListener('click', cancelHandler);
 }
 
-function displayBlurModal(report) {
+function displayPageLimitModal(report) {
     const modal = document.getElementById('authenticity-modal');
     const verdictEl = document.getElementById('auth-verdict');
     const summaryEl = document.getElementById('auth-summary');
@@ -126,13 +135,24 @@ function displayBlurModal(report) {
     // Update modal title
     const modalHeader = modal.querySelector('.modal-header h3');
     if (modalHeader) {
-        modalHeader.textContent = 'Image Quality Issue Detected';
+        modalHeader.textContent = '📄 Document Page Limit Exceeded';
     }
     
-    // Populate the content
-    verdictEl.textContent = 'BLURRED IMAGE';
-    verdictEl.className = 'auth-verdict verdict-BLURRED';
-    summaryEl.textContent = report.summary;
+    // Populate the content with better messaging
+    verdictEl.textContent = 'PAGE LIMIT EXCEEDED';
+    verdictEl.className = 'auth-verdict verdict-PAGE_LIMIT_EXCEEDED';
+    
+    // Create a more detailed message
+    const pageDetails = report.page_details || {};
+    const pageCount = pageDetails.page_count || 0;
+    const maxPages = pageDetails.max_pages || 15;
+    
+    let detailedMessage = `Your document exceeds the maximum page limit.\n\n`;
+    detailedMessage += `Document Pages: ${pageCount}\n`;
+    detailedMessage += `Maximum Allowed: ${maxPages}\n\n`;
+    detailedMessage += `Recommendation: ${report.summary}`;
+    
+    summaryEl.textContent = detailedMessage;
 
     // Show the modal
     modal.style.display = 'flex';
@@ -144,8 +164,17 @@ function displayBlurModal(report) {
 
     const continueHandler = () => {
         modal.style.display = 'none';
-        // Don't proceed with analysis for blurred images
-        alert('Please upload a clearer image before proceeding with the analysis.');
+        // Clear the file input to allow re-upload
+        const fileInput = document.getElementById('file-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        // Reset upload area text
+        const uploadBox = document.getElementById('upload-box');
+        if (uploadBox) {
+            uploadBox.querySelector('h3').textContent = 'Drag & Drop Your File Here';
+            uploadBox.querySelector('p').textContent = 'or click to select a file (PDF, TXT, JPG, PNG)';
+        }
     };
 
     const cancelHandler = () => {
@@ -154,11 +183,12 @@ function displayBlurModal(report) {
     
     const newContinueBtn = continueBtn.cloneNode(true);
     continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
-    newContinueBtn.textContent = 'Upload New Image';
-    newContinueBtn.addEventListener('click', cancelHandler);
+    newContinueBtn.textContent = 'Upload New Document';
+    newContinueBtn.addEventListener('click', continueHandler);
 
     const newCancelBtn = cancelBtn.cloneNode(true);
     cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    newCancelBtn.textContent = 'Cancel';
     newCancelBtn.addEventListener('click', cancelHandler);
 }
 

@@ -9,6 +9,7 @@ import io
 from google.oauth2 import service_account
 from google.auth import default as google_auth_default
 from fpdf import FPDF
+import PyPDF2
 
 # --- CONFIGURATION ---
 PROJECT_ID = "legalease-ai-471416"
@@ -42,6 +43,62 @@ vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
 # --- MODEL INSTANTIATION: Define the model once to be reused ---
 model = GenerativeModel("gemini-2.5-flash")
 
+
+def count_pdf_pages(file_content: bytes) -> int:
+    """
+    Count the number of pages in a PDF document.
+    Returns the page count or 0 if unable to count.
+    """
+    try:
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+        return len(pdf_reader.pages)
+    except Exception as e:
+        print(f"Error counting PDF pages: {e}")
+        return 0
+
+
+def check_page_limit(file_content: bytes, mime_type: str, max_pages: int = 15) -> dict:
+    """
+    Check if the document exceeds the page limit.
+    Returns a dictionary with limit status and details.
+    """
+    try:
+        if mime_type == 'application/pdf':
+            page_count = count_pdf_pages(file_content)
+            if page_count > max_pages:
+                return {
+                    "exceeds_limit": True,
+                    "page_count": page_count,
+                    "max_pages": max_pages,
+                    "message": f"Document exceeds page limit. Found {page_count} pages, maximum allowed is {max_pages}.",
+                    "recommendation": "Please split your document into smaller parts or upload a document with fewer pages."
+                }
+            else:
+                return {
+                    "exceeds_limit": False,
+                    "page_count": page_count,
+                    "max_pages": max_pages,
+                    "message": f"Document has {page_count} pages, within the limit of {max_pages}.",
+                    "recommendation": "Proceeding with analysis."
+                }
+        else:
+            # For non-PDF files, assume they're within limits
+            return {
+                "exceeds_limit": False,
+                "page_count": 1,
+                "max_pages": max_pages,
+                "message": "Non-PDF document, no page limit applied.",
+                "recommendation": "Proceeding with analysis."
+            }
+    except Exception as e:
+        print(f"Error checking page limit: {e}")
+        return {
+            "exceeds_limit": False,
+            "page_count": 0,
+            "max_pages": max_pages,
+            "message": "Unable to check page count, proceeding with analysis.",
+            "recommendation": "Proceeding with analysis."
+        }
 
 
 def analyze_risks(text: str, target_language: str = "English") -> list[dict]:

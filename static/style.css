@@ -1313,6 +1313,6 @@ textarea.upload-area {
 .verdict-REAL {
     background-color: #34d399; /* Green */
 }
-.verdict-BLURRED {
-    background-color: #f59e0b; /* Orange */
+.verdict-PAGE_LIMIT_EXCEEDED {
+    background-color: #ef4444; /* Red */
 }
