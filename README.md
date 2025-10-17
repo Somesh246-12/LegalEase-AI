@@ -1,6 +1,6 @@
 # LegalEase AI ✨
 
-A web application built for the Google Cloud Gen AI Exchange Hackathon that demystifies complex legal documents using the power of Google's Gemini models on Vertex AI.
+A web application that demystifies complex legal documents using the power of Google's Gemini models on Vertex AI.
 
 ---
 
@@ -117,4 +117,5 @@ To get a local copy up and running, follow these simple steps.
 ---
 
 > **Disclaimer:** This tool is for informational purposes only and does not constitute legal advice. Always consult with a qualified legal professional for any legal matters.
+
 
