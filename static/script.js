@@ -55,7 +55,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
                 // 4. Hide the loader and show the modal with the results
                 loader.style.display = 'none';
-                displayAuthenticityModal(report);
+                
+                // Check if the document is blurred
+                if (report.verdict === 'BLURRED') {
+                    displayBlurModal(report);
+                } else {
+                    displayAuthenticityModal(report);
+                }
     
             } catch (error) {
                 console.error("Authenticity check failed:", error);
@@ -106,6 +112,50 @@ function displayAuthenticityModal(report) {
     const newContinueBtn = continueBtn.cloneNode(true);
     continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
     newContinueBtn.addEventListener('click', continueHandler);
+
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    newCancelBtn.addEventListener('click', cancelHandler);
+}
+
+function displayBlurModal(report) {
+    const modal = document.getElementById('authenticity-modal');
+    const verdictEl = document.getElementById('auth-verdict');
+    const summaryEl = document.getElementById('auth-summary');
+    
+    // Update modal title
+    const modalHeader = modal.querySelector('.modal-header h3');
+    if (modalHeader) {
+        modalHeader.textContent = 'Image Quality Issue Detected';
+    }
+    
+    // Populate the content
+    verdictEl.textContent = 'BLURRED IMAGE';
+    verdictEl.className = 'auth-verdict verdict-BLURRED';
+    summaryEl.textContent = report.summary;
+
+    // Show the modal
+    modal.style.display = 'flex';
+
+    // Update button handlers
+    const uploadForm = document.getElementById('upload-form');
+    const continueBtn = document.getElementById('auth-continue-btn');
+    const cancelBtn = document.getElementById('auth-cancel-btn');
+
+    const continueHandler = () => {
+        modal.style.display = 'none';
+        // Don't proceed with analysis for blurred images
+        alert('Please upload a clearer image before proceeding with the analysis.');
+    };
+
+    const cancelHandler = () => {
+        modal.style.display = 'none';
+    };
+    
+    const newContinueBtn = continueBtn.cloneNode(true);
+    continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+    newContinueBtn.textContent = 'Upload New Image';
+    newContinueBtn.addEventListener('click', cancelHandler);
 
     const newCancelBtn = cancelBtn.cloneNode(true);
     cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
@@ -203,35 +253,6 @@ function displayAuthenticityModal(report) {
     }
 
     // --- 6. Functions to run ONLY if results are on the page ---
-    async function loadRiskData() {
-        try {
-            const res = await fetch('/risks.json');
-            const data = await res.json();
-            const stats = data.stats || { severity: {}, type: {} };
-            const sev = stats.severity || {};
-            const sevCtx = document.getElementById('severityChart');
-            if (sevCtx) {
-                new Chart(sevCtx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['High', 'Medium', 'Low'],
-                        datasets: [{
-                            data: [sev.high || 0, sev.medium || 0, sev.low || 0],
-                            backgroundColor: ['#ff6b6b', '#ffd166', '#06d6a0'],
-                            hoverOffset: 6,
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        cutout: '60%',
-                        plugins: { legend: { position: 'bottom' } }
-                    }
-                });
-            }
-        } catch (e) {
-            console.error('Charts error', e);
-        }
-    }
 
     /**
      * Finds all risk items on the page and makes their headers clickable
@@ -252,12 +273,125 @@ function displayAuthenticityModal(report) {
         });
     }
 
+    /**
+     * Initialize risk filtering functionality
+     */
+    function initializeRiskFiltering() {
+        const filterButtons = {
+            'filter-high-risks': 'risk-high',
+            'filter-medium-risks': 'risk-medium',
+            'filter-low-risks': 'risk-low',
+            'show-all-risks': 'all'
+        };
+
+        Object.entries(filterButtons).forEach(([buttonId, filterClass]) => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.addEventListener('click', () => {
+                    // Remove active class from all buttons
+                    Object.keys(filterButtons).forEach(id => {
+                        const btn = document.getElementById(id);
+                        if (btn) {
+                            btn.classList.remove('btn-primary');
+                            btn.classList.add('btn-outline');
+                        }
+                    });
+
+                    // Add active class to clicked button
+                    button.classList.remove('btn-outline');
+                    button.classList.add('btn-primary');
+
+                    // Filter risk items
+                    const riskItems = document.querySelectorAll('.risk-item');
+                    riskItems.forEach(item => {
+                        if (filterClass === 'all' || item.classList.contains(filterClass)) {
+                            item.style.display = 'block';
+                            item.style.animation = 'fadeIn 0.5s ease-in';
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+                });
+            }
+        });
+    }
+
+    /**
+     * Initialize summary interactive features
+     */
+    function initializeSummaryFeatures() {
+        // Copy summary functionality
+        const copyBtn = document.getElementById('copy-summary');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                const summaryContent = document.getElementById('summary-content');
+                if (summaryContent) {
+                    const text = summaryContent.textContent || summaryContent.innerText;
+                    navigator.clipboard.writeText(text).then(() => {
+                        copyBtn.innerHTML = '<span class="btn-icon">✅</span><span>Copied!</span>';
+                        setTimeout(() => {
+                            copyBtn.innerHTML = '<span class="btn-icon">📋</span><span>Copy Summary</span>';
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy text: ', err);
+                    });
+                }
+            });
+        }
+
+        // Highlight key points functionality
+        const highlightBtn = document.getElementById('highlight-key-points');
+        if (highlightBtn) {
+            highlightBtn.addEventListener('click', () => {
+                const summaryContent = document.getElementById('summary-content');
+                if (summaryContent) {
+                    const paragraphs = summaryContent.querySelectorAll('p');
+                    paragraphs.forEach((p, index) => {
+                        if (index % 2 === 0) { // Highlight every other paragraph
+                            p.style.background = 'rgba(77, 171, 247, 0.1)';
+                            p.style.borderLeft = '4px solid #4dabf7';
+                            p.style.paddingLeft = '1rem';
+                        }
+                    });
+                    highlightBtn.innerHTML = '<span class="btn-icon">🎯</span><span>Key Points Highlighted</span>';
+                }
+            });
+        }
+
+        // Toggle readability functionality
+        const readabilityBtn = document.getElementById('toggle-readability');
+        if (readabilityBtn) {
+            let isReadabilityMode = false;
+            readabilityBtn.addEventListener('click', () => {
+                const summaryContent = document.getElementById('summary-content');
+                if (summaryContent) {
+                    if (!isReadabilityMode) {
+                        // Enable readability mode
+                        summaryContent.style.fontSize = '1.2rem';
+                        summaryContent.style.lineHeight = '2';
+                        summaryContent.style.letterSpacing = '0.5px';
+                        readabilityBtn.innerHTML = '<span class="btn-icon">🔍</span><span>Normal View</span>';
+                        isReadabilityMode = true;
+                    } else {
+                        // Disable readability mode
+                        summaryContent.style.fontSize = '';
+                        summaryContent.style.lineHeight = '';
+                        summaryContent.style.letterSpacing = '';
+                        readabilityBtn.innerHTML = '<span class="btn-icon">👁️</span><span>Toggle Readability</span>';
+                        isReadabilityMode = false;
+                    }
+                }
+            });
+        }
+    }
+
     // --- Initialization logic ---
     // Check if the results div exists by checking the flask variable
     const hasResult = document.querySelector('.main-content.container');
     if (hasResult) {
-        loadRiskData();
         initializeRiskAccordion();
+        initializeRiskFiltering();
+        initializeSummaryFeatures();
     }
 
 });

@@ -12,7 +12,6 @@
         href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&family=Roboto:wght@400;500&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -88,11 +87,43 @@
             <div class="split-screen">
                 <div class="text-pane simplified-pane">
                     <h2>Simplified Explanation</h2>
-                    <div class="ai-result">{{ result | safe }}</div>
+                    <div class="summary-actions btn-group">
+                        <button type="button" class="btn btn-outline btn-pill" id="copy-summary">
+                            <span class="btn-icon">📋</span>
+                            <span>Copy Summary</span>
+                        </button>
+                        <button type="button" class="btn btn-outline btn-pill" id="highlight-key-points">
+                            <span class="btn-icon">✨</span>
+                            <span>Highlight Key Points</span>
+                        </button>
+                        <button type="button" class="btn btn-outline btn-pill" id="toggle-readability">
+                            <span class="btn-icon">👁️</span>
+                            <span>Toggle Readability</span>
+                        </button>
+                    </div>
+                    <div class="ai-result" id="summary-content">{{ result | safe }}</div>
                 </div>
                 <!-- NEW: Risk Analysis Pane -->
                 <div class="text-pane risk-pane">
                     <h2>Risk Analysis</h2>
+                    <div class="risk-actions-top btn-group">
+                        <button type="button" class="btn btn-primary btn-pill" id="filter-high-risks">
+                            <span class="btn-icon">🔴</span>
+                            <span>High Risks</span>
+                        </button>
+                        <button type="button" class="btn btn-outline btn-pill" id="filter-medium-risks">
+                            <span class="btn-icon">🟡</span>
+                            <span>Medium Risks</span>
+                        </button>
+                        <button type="button" class="btn btn-outline btn-pill" id="filter-low-risks">
+                            <span class="btn-icon">🟢</span>
+                            <span>Low Risks</span>
+                        </button>
+                        <button type="button" class="btn btn-outline btn-pill" id="show-all-risks">
+                            <span class="btn-icon">📋</span>
+                            <span>All Risks</span>
+                        </button>
+                    </div>
                     <div class="risk-actions-top btn-group">
                         <button type="button" class="btn btn-primary btn-pill"
                             onclick="window.location.href='/export.csv'">
@@ -105,18 +136,8 @@
                             <span>Export PDF</span>
                         </button>
                     </div>
-                    <div class="risk-legend">
-                        <span class="legend-item risk-high">High</span>
-                        <span class="legend-item risk-medium">Medium</span>
-                        <span class="legend-item risk-low">Low</span>
-                    </div>
-                    <div class="risk-result">{{ risk_html | safe }}</div>
-                    <div class="risk-charts two-col">
-                        <div class="chart-card">
-                            <h4>Risks by Severity</h4>
-                            <canvas id="severityChart" height="90"></canvas>
-                        </div>
-                    </div>
+                    
+                    <div class="risk-result" id="risk-results">{{ risk_html | safe }}</div>
                 </div>
             </div>
             <footer class="main-footer">
