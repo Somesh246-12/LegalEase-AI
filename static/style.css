@@ -799,7 +799,8 @@ textarea.upload-area {
 
 /* Documentation Modal Styles */
 .modal-content.large {
-    width: min(900px, 94vw); /* Wider modal for documentation */
+    width: min(900px, 94vw);
+    /* Wider modal for documentation */
 }
 
 .docs-body {
@@ -840,7 +841,7 @@ textarea.upload-area {
     margin-bottom: 0.75rem;
 }
 
-#docs-close-btn{
+#docs-close-btn {
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -856,8 +857,10 @@ textarea.upload-area {
 /* This is the dark, full-screen background overlay */
 .modal {
     position: fixed;
-    inset: 0; /* This is a shortcut for top: 0; right: 0; bottom: 0; left: 0; */
-    background: rgba(18, 24, 41, 0.7); /* Dark semi-transparent background */
+    inset: 0;
+    /* This is a shortcut for top: 0; right: 0; bottom: 0; left: 0; */
+    background: rgba(18, 24, 41, 0.7);
+    /* Dark semi-transparent background */
     backdrop-filter: blur(8px);
 
     /* This is the key part that centers the content */
@@ -865,13 +868,16 @@ textarea.upload-area {
     align-items: center;
     justify-content: center;
 
-    z-index: 9999; /* Ensures it's on top of everything */
-    padding: 20px; /* Prevents content from touching screen edges on mobile */
+    z-index: 9999;
+    /* Ensures it's on top of everything */
+    padding: 20px;
+    /* Prevents content from touching screen edges on mobile */
 }
 
 /* This is the white panel that holds the content */
 .modal-content {
-    width: min(720px, 94vw); /* Max width of 720px, but shrinks on small screens */
+    width: min(720px, 94vw);
+    /* Max width of 720px, but shrinks on small screens */
     background: #202531;
     border: 1px solid var(--border-color);
     border-radius: 14px;
@@ -914,7 +920,8 @@ textarea.upload-area {
 
 .modal-body {
     padding: 18px;
-    overflow-y: auto; /* Allows content to scroll if it's too long */
+    overflow-y: auto;
+    /* Allows content to scroll if it's too long */
 }
 
 /* Specific styles for the rewrite modal content */
@@ -934,4 +941,124 @@ textarea.upload-area {
     font-size: 14px;
     line-height: 1.6;
     min-height: 150px;
+}
+
+/* --- POLISHES & ADDITIONS --- */
+
+/* 1. Loading Indicator Styles (Highest Impact) */
+.loader-overlay {
+    position: fixed;
+    inset: 0;
+    /* Covers the entire screen */
+    background: rgba(18, 24, 41, 0.8);
+    /* Semi-transparent dark background */
+    backdrop-filter: blur(5px);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    gap: 1.5rem;
+}
+
+.loader-spinner {
+    width: 60px;
+    height: 60px;
+    border: 5px solid var(--border-color);
+    border-top-color: var(--secondary-color);
+    /* The spinning color */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 2. Accessibility Fix for Risk Colors in Modal */
+/* Replaces the deprecated <font> tag */
+.text-risk-high {
+    color: #f87171;
+}
+
+.text-risk-medium {
+    color: #facc15;
+}
+
+.text-risk-low {
+    color: #34d399;
+}
+
+
+/* --- NEW: Warning Banner Style --- */
+.warning-banner {
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+    border-radius: 12px;
+    background-color: rgba(255, 209, 102, 0.1);
+    /* Light yellow background */
+    border: 1px solid rgba(255, 209, 102, 0.4);
+    /* Yellow border */
+    color: #fff1c2;
+    /* Light yellow text */
+    text-align: center;
+}
+
+.warning-banner strong {
+    color: #ffd166;
+    /* A stronger yellow for the "Heads Up" */
+}
+
+/* --- NEW: Interactive Risk Accordion Styles --- */
+
+.risk-header {
+    cursor: pointer;
+    /* Makes it obvious it's clickable */
+    position: relative;
+    padding-right: 25px;
+    /* Space for the expand icon */
+}
+
+/* Create the '+' icon */
+.risk-header::after {
+    content: '+';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.5rem;
+    font-weight: 300;
+    color: var(--text-secondary);
+    transition: transform 0.3s ease;
+}
+
+/* Hide the risk body by default with a smooth transition */
+.risk-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-out, opacity 0.3s ease;
+    opacity: 0;
+    margin-top: 0;
+    /* Remove margin when collapsed */
+}
+
+/* When the item is active, show the body */
+.risk-item.active .risk-body {
+    max-height: 500px;
+    /* A large enough value to show all content */
+    opacity: 1;
+    margin-top: 1rem;
+    /* Add margin back when expanded */
+    transition: max-height 0.5s ease-in, opacity 0.5s ease 0.1s;
+}
+
+/* When the item is active, change the icon to '-' */
+.risk-item.active .risk-header::after {
+    content: '−';
+    /* A minus sign */
+    transform: translateY(-50%) rotate(180deg);
 }

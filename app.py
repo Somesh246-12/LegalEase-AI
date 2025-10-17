@@ -14,7 +14,8 @@ from legal_analyzer import (
     rewrite_clause,
     risks_to_csv,
     risks_to_html,
-    risks_to_pdf_bytes
+    risks_to_pdf_bytes,
+    is_legal_document  # pyright: ignore[reportUnusedImport]
 )
 
 # --- NEW, MORE ROBUST CREDENTIALS LOGIC ---
@@ -80,6 +81,7 @@ def index():
     html_result = None
     original_text = ""
     risk_html = None
+    warning_message = None
 
     if request.method == "POST":
         selected_language = request.form.get("target_language", "English")
@@ -98,6 +100,9 @@ def index():
             original_text = text_to_analyze
 
             if text_to_analyze:
+
+                if not is_legal_document(text_to_analyze):
+                    warning_message = "This does not appear to be a legal document. The analysis may be less accurate, but here is our best effort:"
                 html_result = summarize_text(text_to_analyze, target_language=selected_language)
                 risks = analyze_risks(text_to_analyze, target_language=selected_language)
                 risk_html = render_risks_html(risks, target_language=selected_language)
@@ -109,7 +114,7 @@ def index():
         except Exception as e:
             html_result = f"<p style='color: #ff6b6b;'><b>Error:</b> Could not process the document. Details: {e}</p>"
 
-    return render_template("index.html", result=html_result, original_text=original_text, risk_html=risk_html)
+    return render_template("index.html", result=html_result, original_text=original_text, risk_html=risk_html, warning_message=warning_message)
 
 
 @app.route("/chat", methods=["POST"])

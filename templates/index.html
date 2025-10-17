@@ -64,6 +64,12 @@
                             <option value="Marathi">मराठी (Marathi)</option>
                         </select>
                     </div>
+
+                    <div id="loader" class="loader-overlay" style="display: none;">
+                        <div class="loader-spinner"></div>
+                        <p>Analyzing your document... This may take a moment.</p>
+                    </div>
+
                     <button type="submit" class="btn-cta">Simplify Document</button>
                 </form>
             </div>
@@ -71,6 +77,14 @@
         {% if result %}
         <section class="main-content container">
             <div id="document-context" style="display: none;">{{ original_text | safe }}</div>
+
+            {% if warning_message %}
+            <div class="warning-banner">
+                <strong>Heads Up:</strong> {{ warning_message }}
+            </div>
+            {% endif %}
+
+
             <div class="split-screen">
                 <div class="text-pane simplified-pane">
                     <h2>Simplified Explanation</h2>
@@ -184,8 +198,10 @@
                 </ul>
 
                 <h3>Who This Helps</h3>
-                <p>LegalEase AI is for anyone who has ever felt overwhelmed by a contract. It's for <strong>freelancers</strong>
-                    reviewing client agreements, <strong>small business owners</strong> signing vendor contracts, <strong>tenants</strong>
+                <p>LegalEase AI is for anyone who has ever felt overwhelmed by a contract. It's for
+                    <strong>freelancers</strong>
+                    reviewing client agreements, <strong>small business owners</strong> signing vendor contracts,
+                    <strong>tenants</strong>
                     navigating lease agreements, and every consumer who wants to be informed before they click "I
                     Agree." Our mission is to level the playing field and make legal understanding a right, not a
                     privilege.</p>
@@ -193,227 +209,8 @@
         </div>
     </div>
 
-    <script>
-        const tabs = document.querySelectorAll('.tab-button');
-        const panels = document.querySelectorAll('.input-panel');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                tabs.forEach(t => t.classList.remove('active'));
-                panels.forEach(p => p.classList.remove('active'));
-                tab.classList.add('active');
-                const panelId = tab.getAttribute('data-tab');
-                document.getElementById(panelId).classList.add('active');
-            });
-        });
-        const uploadBox = document.getElementById('upload-box');
-        const fileInput = document.getElementById('file-input');
-        if (uploadBox && fileInput) {
-            uploadBox.addEventListener('click', () => { fileInput.click(); });
-            fileInput.addEventListener('change', () => {
-                if (fileInput.files.length > 0) {
-                    uploadBox.querySelector('h3').textContent = fileInput.files[0].name;
-                    uploadBox.querySelector('p').textContent = 'File selected. Ready to simplify!';
-                }
-            });
-        }
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
 
-        // --- Chatbot JavaScript ---
-        const chatWindow = document.getElementById('chat-window');
-        const chatToggleButton = document.getElementById('chat-toggle-button');
-        const chatCloseButton = document.getElementById('chat-close-button');
-        const chatInput = document.getElementById('chat-input');
-        const chatSendButton = document.getElementById('chat-send-button');
-        const chatBody = document.getElementById('chat-body');
-
-        // Toggle chat window visibility (guarded)
-        if (chatToggleButton && chatWindow) {
-            chatToggleButton.addEventListener('click', () => {
-                chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
-            });
-        }
-        if (chatCloseButton && chatWindow) {
-            chatCloseButton.addEventListener('click', () => {
-                chatWindow.style.display = 'none';
-            });
-        }
-
-        // Function to add a message to the chat body
-        function addMessage(text, sender) {
-            if (!chatBody) return;
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-message ${sender}`;
-            messageDiv.textContent = text;
-            chatBody.appendChild(messageDiv);
-            chatBody.scrollTop = chatBody.scrollHeight; // Auto-scroll to bottom
-        }
-
-        // Function to handle sending a message
-        async function sendMessage() {
-            const userInput = chatInput ? chatInput.value.trim() : '';
-            if (userInput === '') return;
-
-            addMessage(userInput, 'user');
-            if (chatInput) chatInput.value = '';
-
-            // NEW: Get the document context from the hidden div (guarded)
-            const docCtxEl = document.getElementById('document-context');
-            const documentContext = docCtxEl ? docCtxEl.textContent : '';
-
-            const messages = chatBody ? Array.from(chatBody.querySelectorAll('.chat-message')).map(msg => ({
-                role: msg.classList.contains('user') ? 'user' : 'model',
-                text: msg.textContent,
-            })) : [];
-
-            // Send history AND document context to the backend
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        history: messages,
-                        document_text: documentContext // NEW: Send document text
-                    }),
-                });
-                const data = await response.json();
-                addMessage(data.response, 'bot');
-            } catch (error) {
-                addMessage("Sorry, I couldn't get a response right now.", 'bot');
-                console.error('Chat error:', error);
-            }
-        }
-
-        // Charts + Rewrite wiring
-        async function loadRiskData() {
-            try {
-                const res = await fetch('/risks.json');
-                const data = await res.json();
-                const stats = data.stats || { severity: {}, type: {} };
-                const sev = stats.severity || {};
-                const sevCtx = document.getElementById('severityChart');
-                if (sevCtx) {
-                    const donut = new Chart(sevCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['High', 'Medium', 'Low'],
-                            datasets: [{
-                                data: [sev.high || 0, sev.medium || 0, sev.low || 0],
-                                backgroundColor: ['#ff6b6b', '#ffd166', '#06d6a0'],
-                                hoverOffset: 6,
-                                borderWidth: 0
-                            }]
-                        },
-                        options: {
-                            cutout: '60%',
-                            plugins: { legend: { position: 'bottom' } }
-                        }
-                    });
-                }
-            } catch (e) {
-                console.error('Charts error', e);
-            }
-        }
-
-        async function requestRewrite(clause, mode) {
-            const languageSel = document.getElementById('target_language');
-            const language = languageSel ? languageSel.value : 'English';
-            const res = await fetch('/rewrite', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clause, mode, language })
-            });
-            const data = await res.json();
-            return data.rewrite || 'No rewrite available.';
-        }
-
-        function bindRewriteButtons() {
-            const modal = document.getElementById('rewrite-modal');
-            const out = document.getElementById('rewrite-output');
-            const closeBtn = document.getElementById('rewrite-close');
-            if (closeBtn && modal) closeBtn.onclick = () => { modal.style.display = 'none'; };
-            document.body.addEventListener('click', async (e) => {
-                const btn = e.target.closest('.rewrite-btn');
-                if (!btn) return;
-                const clause = btn.getAttribute('data-clause') || '';
-                const selectedMode = document.querySelector('input[name="rewrite-mode"]:checked');
-                const mode = selectedMode ? selectedMode.value : 'plain';
-                modal.style.display = 'block';
-                out.textContent = 'Generating safer rewrite...';
-                try {
-                    const rewrite = await requestRewrite(clause, mode);
-                    out.textContent = rewrite;
-                } catch (err) {
-                    out.textContent = 'Failed to generate rewrite.';
-                }
-            });
-        }
-
-        function simplifyRiskLanguage() {
-            const MAX = 160;
-            const ellipsis = chr => (chr.length > 0 ? '…' : '');
-            document.querySelectorAll('.risk-item').forEach(item => {
-                ['risk-issue', 'risk-suggestion'].forEach(cls => {
-                    const el = item.querySelector(`.${cls}`);
-                    if (!el) return;
-                    const strong = el.querySelector('b');
-                    const label = strong ? strong.outerHTML : '';
-                    const text = el.innerText.replace(/^.*?:\s*/, '');
-                    if (text.length > MAX) {
-                        const short = text.slice(0, MAX);
-                        const more = document.createElement('a');
-                        more.href = '#';
-                        more.className = 'more-link';
-                        more.textContent = ' More';
-                        const span = document.createElement('span');
-                        span.textContent = short + '…';
-                        el.innerHTML = label;
-                        el.appendChild(span);
-                        el.appendChild(more);
-                        more.addEventListener('click', (evt) => {
-                            evt.preventDefault();
-                            el.innerHTML = label + text;
-                        });
-                    }
-                });
-            });
-        }
-
-        // Initialize when result present (template-driven boolean via string)
-        const hasResult = "{{ '1' if result else '0' }}";
-        if (hasResult === '1') {
-            loadRiskData();
-            bindRewriteButtons();
-            simplifyRiskLanguage();
-        }
-        if (chatSendButton) {
-            chatSendButton.addEventListener('click', sendMessage);
-        }
-        // Allow sending by pressing Enter
-        if (chatInput) {
-            chatInput.addEventListener('keypress', (event) => {
-                if (event.key === 'Enter') {
-                    sendMessage();
-                }
-            });
-        }
-
-        // --- Documentation Modal JavaScript ---
-        const docsModal = document.getElementById('docs-modal');
-        const whyLegaleaseBtn = document.getElementById('why-legalease-btn');
-        const docsCloseBtn = document.getElementById('docs-close-btn');
-
-        if (whyLegaleaseBtn) {
-            whyLegaleaseBtn.addEventListener('click', (e) => {
-                e.preventDefault(); // Prevent page from jumping to top
-                if (docsModal) docsModal.style.display = 'flex';
-            });
-        }
-
-        if (docsCloseBtn) {
-            docsCloseBtn.addEventListener('click', () => {
-                if (docsModal) docsModal.style.display = 'none';
-            });
-        }
-    </script>
 </body>
 
 </html>

@@ -79,21 +79,21 @@ def analyze_risks(text: str, target_language: str = "English") -> list[dict]:
     You are a senior contract analyst. Read the document and extract a concise list of potential risks.
     Return STRICT JSON ONLY, no markdown, no commentary, matching this schema exactly:
     {{
-      "risks": [
-        {{
-          "clause": "short quote or heading from the clause",
-          "issue": "what could go wrong / unfavorable term",
-          "severity": "low|medium|high",
-          "type": "category like IP, liability, payment, confidentiality, termination, SLA, data protection, etc.",
-          "worst_case": "one-line worst-case outcome in practical terms",
-          "suggestion": "practical mitigation or redline suggestion"
-        }}
-      ]
+    "risks": [
+    {{
+      "clause": "Short quote or heading from the relevant clause.",
+      "issue": "A brief, one-sentence explanation of the potential problem.",
+      "severity": "low|medium|high",
+      "type": "A single category like IP, Liability, Payment, Termination, etc.",
+      "worst_case": "A very short, practical worst-case outcome (max 10 words).",
+      "suggestion": "A short, actionable tip. Start with a verb (e.g., 'Clarify...', 'Negotiate...', 'Define...')."
+    }}
+    ]
     }}
     CRITICAL:
-    - The values of "clause", "issue" and "suggestion" MUST be written in this language: {target_language}
-    - The value of "severity" MUST be one of: low, medium, high (lowercase, English)
-    - "type" should be a single short word or phrase in {target_language} that best describes the risk category
+    - The values for "clause", "issue", and "suggestion" MUST be written in this language: {target_language}
+    - The value for "severity" MUST be one of: low, medium, high (lowercase, English)
+    - "type" should be a single short word or phrase in {target_language} that best describes the risk category.
     Document:
     ---
     {text}
@@ -341,14 +341,16 @@ def summarize_text(text: str, target_language: str = "English") -> str:
     """Generates a simple summary of the text."""
     # REMOVED: vertexai.init() call was here
     prompt = f"""
-    You are an expert paralegal AI assistant. Your goal is to simplify complex legal documents for the average person.
-    Analyze the following legal clause and provide a simple, easy-to-understand summary.
-    Use Markdown for formatting, such as headings, bold text, and bullet points.
+    You are an expert paralegal AI assistant. Your goal is to simplify complex legal documents for the average person, providing a balanced summary that is detailed but easy to read.
 
-    IMPORTANT: You must provide your entire response in the following language: {target_language}
+    **Output Structure:**
+    1.  **Document Purpose:** Start with a 1-2 sentence overview explaining what this document is for (e.g., 'This is a freelance contract for web design services between a client and a developer.').
+    2.  **Key Sections Explained:** Below the overview, create a summary of the document's main sections. For each section, use a bolded heading (like **Scope of Work** or **Payment Terms**) and provide a 1-3 sentence explanation in simple terms. Cover all important topics present in the document, such as who is involved, main responsibilities, payment details, confidentiality, liability, and how the agreement can be ended.
 
-    Here is the legal clause to analyze:
+    Use Markdown for formatting. The entire response MUST be in this language: **{target_language}**
+
     ---
+    LEGAL TEXT:
     {text}
     ---
     """
@@ -390,6 +392,40 @@ def get_chatbot_response(history: list, document_text: str) -> str:
     except Exception as e:
         print(f"An error occurred in the chatbot: {e}")
         return "Sorry, I'm having a little trouble right now. Please try again in a moment."
+
+
+def is_legal_document(text: str) -> bool:
+    """
+    Uses the AI to perform a quick classification of the text.
+    Returns True if the document appears to be legal in nature, False otherwise.
+    """
+    # Use a very short snippet for speed
+    text_snippet = text[:2000]
+
+    prompt = f"""
+    You are a document classifier. Your task is to determine if the following text is a legal document.
+    Legal documents include contracts, terms of service, non-disclosure agreements, lease agreements, privacy policies, etc.
+    Non-legal documents include articles, stories, recipes, conversations, etc.
+
+    Analyze the text below and respond with a single word: YES or NO.
+
+    ---
+    TEXT:
+    {text_snippet}
+    ---
+    """
+    try:
+        # Use a low temperature for a more deterministic, non-creative answer
+        generation_config = {"temperature": 0.0}
+        response = model.generate_content(prompt, generation_config=generation_config)
+
+        # Check if the response text contains "YES"
+        return "yes" in (response.text or "").strip().lower()
+
+    except Exception as e:
+        print(f"Legal document classification error: {e}")
+        # If classification fails, assume it's legal to proceed without interruption.
+        return True
 
 
 if __name__ == "__main__":
