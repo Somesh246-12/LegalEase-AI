@@ -429,15 +429,209 @@ def is_legal_document(text: str) -> bool:
         return True
 
 
+def detect_document_type(text: str) -> str:
+    """
+    Lightweight LLM call to identify the document type using comprehensive legal classification.
+    Returns detailed document type based on legal document categories.
+    """
+    text_snippet = text[:2000]  # Use smaller snippet for speed
+    
+    prompt = f"""
+You are a legal document classifier. Analyze the following text and determine its document type using this comprehensive classification system:
+
+**PRIMARY CATEGORIES:**
+1. **Contractual Documents** - Create or define legal relationships between parties
+   Examples: Agreements, Employment Contracts, Lease Deeds, Partnership Deeds
+
+2. **Transactional Documents** - Record commercial or financial transactions
+   Examples: Sale Deeds, Loan Agreements, Purchase Orders, Bills of Exchange
+
+3. **Constitutional & Statutory Documents** - Establish governance or organizational rules
+   Examples: Constitution, Articles of Association, Memorandum of Association
+
+4. **Litigation Documents** - Used in court proceedings for legal claims or defense
+   Examples: FIR, Charge Sheet, Writ Petition, Affidavit, Power of Attorney
+
+5. **Property Documents** - Relate to ownership, transfer, or use of immovable property
+   Examples: Sale Deed, Gift Deed, Mortgage Deed, Lease Deed, Title Deed
+
+6. **Financial & Banking Documents** - Govern borrowing, lending, or investment relationships
+   Examples: Promissory Note, Loan Agreement, Bank Guarantee
+
+7. **Personal Legal Documents** - Protect personal rights and family interests
+   Examples: Will, Birth Certificate, Marriage Certificate, Divorce Decree, Adoption Papers
+
+8. **Corporate & Business Documents** - Concern company formation, operation, and compliance
+   Examples: MoA, AoA, Board Resolutions, Annual Reports, Non-Disclosure Agreements
+
+9. **Intellectual Property Documents** - Secure rights to creations or inventions
+   Examples: Patent Application, Trademark Registration, Copyright Assignment
+
+10. **Employment & Labour Documents** - Define employer-employee relationship
+    Examples: Employment Contract, Appointment Letter, Termination Notice
+
+**SECONDARY CLASSIFICATION:**
+- **Registered Documents** - Legally recorded with government authority
+- **Unregistered Documents** - Not registered but may be valid under certain conditions
+- **Attested Documents** - Verified by Notary Public or Gazetted Officer
+- **Stamped Documents** - Include payment of government stamp duty
+
+Respond with ONLY the most specific document type that best fits the content. Use the exact category name from the list above.
+
+---
+TEXT:
+{text_snippet}
+---
+"""
+    
+    try:
+        generation_config = {"temperature": 0.0}
+        response = model.generate_content(prompt, generation_config=generation_config)
+        doc_type = (response.text or "").strip()
+        
+        # Normalize the response to match our expected types
+        doc_type_lower = doc_type.lower()
+        
+        # Map responses to our standardized categories (order matters for overlapping terms)
+        if any(term in doc_type_lower for term in ["employment", "labour", "appointment letter", "termination notice"]):
+            return "Employment & Labour Documents"
+        elif any(term in doc_type_lower for term in ["property", "sale deed", "gift deed", "mortgage deed", "title deed"]):
+            return "Property Documents"
+        elif any(term in doc_type_lower for term in ["financial", "banking", "promissory note", "bank guarantee"]):
+            return "Financial & Banking Documents"
+        elif any(term in doc_type_lower for term in ["litigation", "fir", "charge sheet", "writ petition", "affidavit", "power of attorney"]):
+            return "Litigation Documents"
+        elif any(term in doc_type_lower for term in ["corporate", "business", "board resolution", "annual report", "non-disclosure"]):
+            return "Corporate & Business Documents"
+        elif any(term in doc_type_lower for term in ["intellectual property", "patent", "trademark", "copyright"]):
+            return "Intellectual Property Documents"
+        elif any(term in doc_type_lower for term in ["personal", "will", "birth certificate", "marriage certificate", "divorce decree", "adoption"]):
+            return "Personal Legal Documents"
+        elif any(term in doc_type_lower for term in ["transactional", "purchase order", "bill of exchange"]):
+            return "Transactional Documents"
+        elif any(term in doc_type_lower for term in ["constitutional", "statutory", "articles of association", "memorandum of association"]):
+            return "Constitutional & Statutory Documents"
+        elif any(term in doc_type_lower for term in ["contractual", "agreement", "lease deed", "partnership deed"]):
+            return "Contractual Documents"
+        else:
+            return "Other Legal Documents"
+            
+    except Exception as e:
+        print(f"Document type detection failed: {e}")
+        return "Other Legal Documents"
+
+
+def run_prechecks(text: str) -> int:
+    """
+    Rule-based pre-check that scores from 0-100 based on document characteristics.
+    """
+    score = 0
+    text_lower = text.lower()
+    
+    # Check for date patterns (YYYY or DD-MM-YYYY)
+    date_patterns = [
+        r'\b(19|20)\d{2}\b',  # YYYY format
+        r'\b\d{1,2}[-/]\d{1,2}[-/](19|20)\d{2}\b',  # DD-MM-YYYY or DD/MM/YYYY
+        r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+(19|20)\d{2}\b'  # Month DD, YYYY
+    ]
+    
+    has_date = any(re.search(pattern, text, re.IGNORECASE) for pattern in date_patterns)
+    if has_date:
+        score += 20
+    
+    # Check for names/parties/institutions
+    party_indicators = [
+        r'\b(party|parties|between|agreement between|contract between)',
+        r'\b(plaintiff|defendant|petitioner|respondent)',
+        r'\b(company|corporation|llc|inc|ltd)',
+        r'\b(mr\.|ms\.|mrs\.|dr\.)\s+\w+',
+        r'\b(signed by|witnessed by|notarized by)'
+    ]
+    
+    has_parties = any(re.search(pattern, text_lower) for pattern in party_indicators)
+    if has_parties:
+        score += 20
+    
+    # Check for signature/seal/witness mentions
+    signature_indicators = [
+        r'\b(signature|signed|sign|seal|notary|witness|notarized)',
+        r'\b(executed|acknowledged|sworn|affirmed)'
+    ]
+    
+    has_signature = any(re.search(pattern, text_lower) for pattern in signature_indicators)
+    if has_signature:
+        score += 20
+    
+    # Check word count (>150 words)
+    word_count = len(text.split())
+    if word_count > 150:
+        score += 20
+    elif word_count > 50:
+        score += 10
+    
+    # Check for placeholder text (negative scoring)
+    placeholder_patterns = [
+        r'\b(lorem ipsum|your name|placeholder|sample text|test document)',
+        r'\b(insert|fill in|replace with|xxx|___|\[.*\])',
+        r'\b(template|draft|example|sample)'
+    ]
+    
+    has_placeholders = any(re.search(pattern, text_lower) for pattern in placeholder_patterns)
+    if has_placeholders:
+        score -= 30
+    
+    # Check for legal terminology (bonus points)
+    legal_terms = [
+        r'\b(whereas|hereby|herein|thereof|pursuant to|in accordance with)',
+        r'\b(liability|indemnification|breach|remedy|jurisdiction)',
+        r'\b(confidential|proprietary|intellectual property|copyright)'
+    ]
+    
+    has_legal_terms = any(re.search(pattern, text_lower) for pattern in legal_terms)
+    if has_legal_terms:
+        score += 20
+    
+    # Ensure score is between 0 and 100
+    return max(0, min(100, score))
+
+
 def check_document_authenticity(text: str) -> dict:
     """
-    Performs a more accurate, reasoning-based authenticity check.
+    Performs a multi-stage hybrid authenticity check with document type detection,
+    rule-based pre-checks, and dynamic prompting for improved accuracy.
     """
-    text_snippet = text[:15000] # Use a slightly larger snippet for more context
-
+    text_snippet = text[:15000]  # Use a slightly larger snippet for more context
+    
+    # Stage 1: Document Type Detection
+    doc_type = detect_document_type(text)
+    
+    # Stage 2: Rule-Based Pre-Check
+    precheck_score = run_prechecks(text)
+    
+    # Stage 3: Dynamic Prompting with Type-Specific Expectations
+    type_expectations = {
+        "Contractual Documents": "Should have clear parties, terms, consideration, mutual obligations, and execution details.",
+        "Transactional Documents": "Should record specific commercial/financial transactions with amounts, dates, and parties involved.",
+        "Constitutional & Statutory Documents": "Should establish governance frameworks with clear organizational rules and procedures.",
+        "Litigation Documents": "Should be used in court proceedings with proper legal citations, case numbers, and official formatting.",
+        "Property Documents": "Should relate to immovable property with clear ownership details, property descriptions, and transfer terms.",
+        "Financial & Banking Documents": "Should govern borrowing/lending relationships with financial terms, repayment schedules, and security details.",
+        "Personal Legal Documents": "Should protect personal rights with proper identification, dates, and legal formalities.",
+        "Corporate & Business Documents": "Should concern company operations with corporate structure, compliance requirements, and business terms.",
+        "Intellectual Property Documents": "Should secure rights to creations with specific IP details, ownership claims, and legal protections.",
+        "Employment & Labour Documents": "Should define employer-employee relationships with job terms, compensation, and employment conditions.",
+        "Other Legal Documents": "Should have appropriate legal structure, terminology, and execution elements."
+    }
+    
+    expectation = type_expectations.get(doc_type, "Legal documents should have appropriate structure and execution elements.")
+    
     prompt = f"""
 You are a highly specialized forensic document examiner and authenticity classifier.
 Your goal is to determine whether the given document is **REAL (authentic)**, **SUSPICIOUS (partially authentic)**, or **FAKE (fabricated or AI-generated)** based on forensic, linguistic, and structural cues.
+
+DOCUMENT TYPE: {doc_type}
+TYPE-SPECIFIC EXPECTATIONS: {expectation}
+RULE-BASED PRECHECK SCORE: {precheck_score}/100
 
 Carefully analyze the document according to the following six forensic indicators:
 1. **Consistency & Coherence** — Logical flow, factual consistency, natural transitions, and stable tone.
@@ -445,7 +639,7 @@ Carefully analyze the document according to the following six forensic indicator
 3. **Formatting & Metadata Patterns** — Presence of headers, sections, stamps, references, or official formatting.
 4. **Content Credibility** — Specific, verifiable details (names, locations, laws, institutions) vs. vague placeholders.
 5. **Forgery or Manipulation Signs** — Contradictions, unrealistic claims, missing mandatory clauses, or irregular spacing.
-6. **Purpose Alignment** — Whether the tone, structure, and language match the document’s claimed purpose (e.g., legal, academic, certificate, or report).
+6. **Purpose Alignment** — Whether the tone, structure, and language match the document's claimed purpose ({doc_type}).
 
 Now classify the document strictly as follows:
 
@@ -466,13 +660,13 @@ Now classify the document strictly as follows:
   - Confidence typically **above 75**.
 
 ⚠️ Important:
-Be **conservative** — if any doubt exists, downgrade the verdict to "SUSPICIOUS" or "FAKE" rather than "REAL".
+Be **balanced** — consider both positive and negative indicators. Only mark as "FAKE" if there are clear signs of fabrication or AI generation. Mark as "SUSPICIOUS" for incomplete or questionable documents. Mark as "REAL" for well-structured, credible documents.
 
 Return a STRICT JSON object using this format (no markdown, no extra text):
 
 {{
   "verdict": "REAL | SUSPICIOUS | FAKE",
-  "summary": "A concise 1–2 sentence explanation of your reasoning.",
+  "summary": "A concise 1–3 sentence explanation of your reasoning.",
   "confidence_score": <integer 0–100>,
   "score_breakdown": {{
     "authenticity_score": <0–100>,
@@ -483,20 +677,81 @@ Return a STRICT JSON object using this format (no markdown, no extra text):
 
 ---
 DOCUMENT:
-{text[:15000]}
+{text_snippet}
 ---
 """
 
     try:
         generation_config = {"temperature": 0.0, "response_mime_type": "application/json"}
         response = model.generate_content(prompt, generation_config=generation_config)
-        return json.loads(response.text)
+        llm_result = json.loads(response.text)
+        
+        # Stage 4: Confidence Fusion with Conservative Approach
+        llm_confidence = llm_result.get("confidence_score", 50)  # Default to 50 if missing
+        llm_verdict = llm_result.get("verdict", "SUSPICIOUS")
+        
+        # Get individual scores for more granular analysis
+        score_breakdown = llm_result.get("score_breakdown", {})
+        authenticity_score = score_breakdown.get("authenticity_score", 50)
+        consistency_score = score_breakdown.get("consistency_score", 50)
+        credibility_score = score_breakdown.get("credibility_score", 50)
+        
+        # Calculate weighted average of individual scores (more conservative)
+        avg_llm_score = (authenticity_score + consistency_score + credibility_score) / 3
+        
+        # Use the lower of LLM confidence or average score to prevent inflated confidence
+        conservative_llm_score = min(llm_confidence, avg_llm_score)
+        
+        # Stage 5: Intelligent Verdict Fusion
+        # Trust the LLM verdict but adjust confidence based on precheck alignment
+        if llm_verdict == "FAKE":
+            # For FAKE verdicts, use conservative scoring
+            if precheck_score < 20:  # Very low precheck confirms fake
+                final_confidence = int(min(conservative_llm_score, 25))
+            else:  # Higher precheck suggests it might not be completely fake
+                final_confidence = int(min(conservative_llm_score, 40))
+            verdict = "FAKE"
+        elif llm_verdict == "REAL":
+            # For REAL verdicts, use hybrid confidence
+            final_confidence = int((conservative_llm_score * 0.7) + (precheck_score * 0.3))
+            # Only downgrade to SUSPICIOUS if precheck is very low AND LLM confidence is also low
+            if precheck_score < 30 and conservative_llm_score < 60:
+                verdict = "SUSPICIOUS"
+            else:
+                verdict = "REAL"
+        else:  # SUSPICIOUS
+            # For SUSPICIOUS verdicts, use balanced approach
+            final_confidence = int((conservative_llm_score * 0.6) + (precheck_score * 0.4))
+            verdict = "SUSPICIOUS"
+        
+        # Stage 6: Return clean JSON with all required fields
+        return {
+            "document_type": doc_type,
+            "verdict": verdict,
+            "summary": llm_result.get("summary", "Analysis completed with hybrid verification system."),
+            "confidence_score": final_confidence,
+            "score_breakdown": {
+                "precheck_score": precheck_score,
+                "authenticity_score": authenticity_score,
+                "consistency_score": consistency_score,
+                "credibility_score": credibility_score
+            }
+        }
+        
     except Exception as e:
         print(f"Authenticity check failed: {e}")
+        # Graceful fallback with default to SUSPICIOUS
         return {
-            "verdict": "Caution Advised",
-            "reasoning": "The automated analysis could not be completed, so proceed with caution.",
-            "key_finding": "AI analysis tool failed."
+            "document_type": doc_type,
+            "verdict": "SUSPICIOUS",
+            "summary": "The automated analysis could not be completed, so proceed with caution.",
+            "confidence_score": precheck_score,  # Use precheck score as fallback
+            "score_breakdown": {
+                "precheck_score": precheck_score,
+                "authenticity_score": 50,
+                "consistency_score": 50,
+                "credibility_score": 50
+            }
         }
 
 if __name__ == "__main__":

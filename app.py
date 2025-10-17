@@ -4,6 +4,7 @@ import json
 from google.oauth2 import service_account
 from google.auth import default as google_auth_default
 from google.cloud import documentai
+from concurrent.futures import ThreadPoolExecutor
 
 from legal_analyzer import (
     summarize_text,
@@ -78,6 +79,7 @@ def process_document_with_docai(file_content, mime_type):
 # ... (The rest of your app.py file is the same) ...
 
 @app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["GET", "POST"])
 def index():
     html_result = None
     original_text = ""
@@ -91,6 +93,7 @@ def index():
         pasted_text = request.form.get("legal_text", "")
 
         try:
+            # Step 1: Extract text from the document (this remains sequential)
             if uploaded_file and uploaded_file.filename != '':
                 file_content = uploaded_file.read()
                 mime_type = uploaded_file.mimetype
@@ -101,16 +104,28 @@ def index():
             original_text = text_to_analyze
 
             if text_to_analyze:
-
+                # Step 2: Run the quick legal document check first
                 if not is_legal_document(text_to_analyze):
                     warning_message = "This does not appear to be a legal document. The analysis may be less accurate, but here is our best effort:"
-                html_result = summarize_text(text_to_analyze, target_language=selected_language)
-                risks = analyze_risks(text_to_analyze, target_language=selected_language)
+
+                # --- NEW PARALLEL EXECUTION BLOCK ---
+                # Step 3: Run the two slow AI tasks (summary and risks) at the same time
+                with ThreadPoolExecutor() as executor:
+                    # Submit both functions to the executor to run concurrently
+                    summary_future = executor.submit(summarize_text, text_to_analyze, selected_language)
+                    risks_future = executor.submit(analyze_risks, text_to_analyze, selected_language)
+
+                # Step 4: Wait for both tasks to finish and get their results
+                html_result = summary_future.result()
+                risks = risks_future.result()
+                # --- END OF PARALLEL BLOCK ---
+
+                # Step 5: Proceed with the now-completed results
                 risk_html = render_risks_html(risks, target_language=selected_language)
                 session['risks'] = risks
                 session['risk_language'] = selected_language
             else:
-                 html_result = "<p style='color: #ffcc00;'>Please paste text or upload a file to analyze.</p>"
+                html_result = "<p style='color: #ffcc00;'>Please paste text or upload a file to analyze.</p>"
 
         except Exception as e:
             html_result = f"<p style='color: #ff6b6b;'><b>Error:</b> Could not process the document. Details: {e}</p>"
