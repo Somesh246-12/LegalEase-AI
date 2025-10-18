@@ -10,6 +10,9 @@ from google.oauth2 import service_account
 from google.auth import default as google_auth_default
 from fpdf import FPDF
 import PyPDF2
+from google.cloud import vision
+from PIL import Image
+import base64
 
 # --- CONFIGURATION ---
 PROJECT_ID = "legalease-ai-471416"
@@ -42,6 +45,9 @@ vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
 
 # --- MODEL INSTANTIATION: Define the model once to be reused ---
 model = GenerativeModel("gemini-2.5-flash")
+
+# Initialize Vision API client
+vision_client = vision.ImageAnnotatorClient(credentials=credentials)
 
 
 def count_pdf_pages(file_content: bytes) -> int:
@@ -652,10 +658,10 @@ def run_prechecks(text: str) -> int:
     return max(0, min(100, score))
 
 
-def check_document_authenticity(text: str) -> dict:
+def check_document_authenticity(text: str, file_content: bytes = None, mime_type: str = None) -> dict:
     """
     Performs a multi-stage hybrid authenticity check with document type detection,
-    rule-based pre-checks, and dynamic prompting for improved accuracy.
+    rule-based pre-checks, logo analysis, and dynamic prompting for improved accuracy.
     """
     text_snippet = text[:15000]  # Use a slightly larger snippet for more context
     
@@ -664,6 +670,19 @@ def check_document_authenticity(text: str) -> dict:
     
     # Stage 2: Rule-Based Pre-Check
     precheck_score = run_prechecks(text)
+    
+    # Stage 2.5: Logo Analysis (if file content is provided)
+    logo_analysis = None
+    logo_authenticity_score = 50  # Default neutral score
+    if file_content and mime_type:
+        try:
+            logo_result = check_document_logos(file_content, mime_type)
+            if logo_result["success"]:
+                logo_analysis = logo_result["logo_analysis"]
+                logo_authenticity_score = logo_analysis["overall_logo_authenticity_score"]
+        except Exception as e:
+            print(f"Logo analysis failed: {e}")
+            logo_analysis = None
     
     # Stage 3: Dynamic Prompting with Type-Specific Expectations
     type_expectations = {
@@ -682,13 +701,26 @@ def check_document_authenticity(text: str) -> dict:
     
     expectation = type_expectations.get(doc_type, "Legal documents should have appropriate structure and execution elements.")
     
+    # Prepare logo information for the prompt
+    logo_info = ""
+    if logo_analysis:
+        logo_info = f"""
+LOGO ANALYSIS RESULTS:
+- Total logos detected: {logo_analysis['total_logos_detected']}
+- Authentic logos: {len(logo_analysis['authentic_logos'])}
+- Suspicious logos: {len(logo_analysis['suspicious_logos'])}
+- Unknown logos: {len(logo_analysis['unknown_logos'])}
+- Overall logo authenticity score: {logo_authenticity_score}/100
+- Logo risk factors: {', '.join(logo_analysis['logo_risk_factors']) if logo_analysis['logo_risk_factors'] else 'None detected'}
+"""
+    
     prompt = f"""
 You are a highly specialized forensic document examiner and authenticity classifier.
-Your goal is to determine whether the given document is **REAL (authentic)**, **SUSPICIOUS (partially authentic)**, or **FAKE (fabricated or AI-generated)** based on forensic, linguistic, and structural cues.
+Your goal is to determine whether the given document is **REAL (authentic)**, **SUSPICIOUS (partially authentic)**, or **FAKE (fabricated or AI-generated)** based on forensic, linguistic, structural cues, and logo analysis.
 
 DOCUMENT TYPE: {doc_type}
 TYPE-SPECIFIC EXPECTATIONS: {expectation}
-RULE-BASED PRECHECK SCORE: {precheck_score}/100
+RULE-BASED PRECHECK SCORE: {precheck_score}/100{logo_info}
 
 Carefully analyze the document according to the following six forensic indicators:
 1. **Consistency & Coherence** — Logical flow, factual consistency, natural transitions, and stable tone.
@@ -759,30 +791,39 @@ DOCUMENT:
         # Use the lower of LLM confidence or average score to prevent inflated confidence
         conservative_llm_score = min(llm_confidence, avg_llm_score)
         
+        # Incorporate logo analysis into the scoring
+        if logo_analysis and logo_analysis['total_logos_detected'] > 0:
+            # Logo analysis contributes 20% to the final score
+            logo_weight = 0.2
+            content_weight = 0.8
+            final_llm_score = (conservative_llm_score * content_weight) + (logo_authenticity_score * logo_weight)
+        else:
+            final_llm_score = conservative_llm_score
+        
         # Stage 5: Intelligent Verdict Fusion
         # Trust the LLM verdict but adjust confidence based on precheck alignment
         if llm_verdict == "FAKE":
             # For FAKE verdicts, use conservative scoring
             if precheck_score < 20:  # Very low precheck confirms fake
-                final_confidence = int(min(conservative_llm_score, 25))
+                final_confidence = int(min(final_llm_score, 25))
             else:  # Higher precheck suggests it might not be completely fake
-                final_confidence = int(min(conservative_llm_score, 40))
+                final_confidence = int(min(final_llm_score, 40))
             verdict = "FAKE"
         elif llm_verdict == "REAL":
             # For REAL verdicts, use hybrid confidence
-            final_confidence = int((conservative_llm_score * 0.7) + (precheck_score * 0.3))
+            final_confidence = int((final_llm_score * 0.7) + (precheck_score * 0.3))
             # Only downgrade to SUSPICIOUS if precheck is very low AND LLM confidence is also low
-            if precheck_score < 30 and conservative_llm_score < 60:
+            if precheck_score < 30 and final_llm_score < 60:
                 verdict = "SUSPICIOUS"
             else:
                 verdict = "REAL"
         else:  # SUSPICIOUS
             # For SUSPICIOUS verdicts, use balanced approach
-            final_confidence = int((conservative_llm_score * 0.6) + (precheck_score * 0.4))
+            final_confidence = int((final_llm_score * 0.6) + (precheck_score * 0.4))
             verdict = "SUSPICIOUS"
         
         # Stage 6: Return clean JSON with all required fields
-        return {
+        result = {
             "document_type": doc_type,
             "verdict": verdict,
             "summary": llm_result.get("summary", "Analysis completed with hybrid verification system."),
@@ -795,10 +836,16 @@ DOCUMENT:
             }
         }
         
+        # Add logo analysis if available
+        if logo_analysis:
+            result["logo_analysis"] = logo_analysis
+        
+        return result
+        
     except Exception as e:
         print(f"Authenticity check failed: {e}")
         # Graceful fallback with default to SUSPICIOUS
-        return {
+        fallback_result = {
             "document_type": doc_type,
             "verdict": "SUSPICIOUS",
             "summary": "The automated analysis could not be completed, so proceed with caution.",
@@ -810,6 +857,281 @@ DOCUMENT:
                 "credibility_score": 50
             }
         }
+        
+        # Add logo analysis if available even in fallback
+        if logo_analysis:
+            fallback_result["logo_analysis"] = logo_analysis
+        
+        return fallback_result
+
+
+def extract_images_from_pdf(file_content: bytes) -> list[bytes]:
+    """
+    Extract images from PDF file content.
+    Returns a list of image bytes.
+    """
+    try:
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
+        images = []
+        
+        for page_num, page in enumerate(pdf_reader.pages):
+            if '/XObject' in page['/Resources']:
+                xObject = page['/Resources']['/XObject'].get_object()
+                
+                for obj in xObject:
+                    if xObject[obj]['/Subtype'] == '/Image':
+                        try:
+                            data = xObject[obj].get_data()
+                            images.append(data)
+                        except Exception as e:
+                            print(f"Error extracting image from page {page_num}: {e}")
+                            continue
+        
+        return images
+    except Exception as e:
+        print(f"Error extracting images from PDF: {e}")
+        return []
+
+
+def detect_logos_in_image(image_bytes: bytes) -> list[dict]:
+    """
+    Use Google Cloud Vision API to detect logos in an image.
+    Returns a list of detected logos with their properties.
+    """
+    try:
+        image = vision.Image(content=image_bytes)
+        
+        # Perform logo detection
+        response = vision_client.logo_detection(image=image)
+        logos = response.logo_annotations
+        
+        detected_logos = []
+        for logo in logos:
+            detected_logos.append({
+                "description": logo.description,
+                "score": logo.score,
+                "bounding_poly": [
+                    {"x": vertex.x, "y": vertex.y} 
+                    for vertex in logo.bounding_poly.vertices
+                ]
+            })
+        
+        return detected_logos
+    except Exception as e:
+        print(f"Error detecting logos in image: {e}")
+        return []
+
+
+def get_company_logo_database() -> dict:
+    """
+    Returns a database of known company logos and their authenticity markers.
+    This is a simplified version - in production, this would be a comprehensive database.
+    """
+    return {
+        # Major corporations with high authenticity markers
+        "google": {
+            "authenticity_score": 95,
+            "common_variations": ["Google", "GOOGLE", "google"],
+            "description": "Google LLC official logo",
+            "risk_factors": ["color variations", "font changes", "missing trademark symbol"]
+        },
+        "microsoft": {
+            "authenticity_score": 95,
+            "common_variations": ["Microsoft", "MICROSOFT", "microsoft"],
+            "description": "Microsoft Corporation official logo",
+            "risk_factors": ["color variations", "font changes", "missing trademark symbol"]
+        },
+        "apple": {
+            "authenticity_score": 95,
+            "common_variations": ["Apple", "APPLE", "apple"],
+            "description": "Apple Inc. official logo",
+            "risk_factors": ["color variations", "shape distortions", "missing trademark symbol"]
+        },
+        "amazon": {
+            "authenticity_score": 95,
+            "common_variations": ["Amazon", "AMAZON", "amazon"],
+            "description": "Amazon.com Inc. official logo",
+            "risk_factors": ["color variations", "font changes", "missing trademark symbol"]
+        },
+        "meta": {
+            "authenticity_score": 95,
+            "common_variations": ["Meta", "META", "meta", "Facebook", "FACEBOOK"],
+            "description": "Meta Platforms Inc. official logo",
+            "risk_factors": ["color variations", "font changes", "missing trademark symbol"]
+        },
+        # Financial institutions
+        "jpmorgan": {
+            "authenticity_score": 90,
+            "common_variations": ["JPMorgan", "JPMORGAN", "JP Morgan", "Chase"],
+            "description": "JPMorgan Chase & Co. official logo",
+            "risk_factors": ["color variations", "font changes", "missing trademark symbol"]
+        },
+        "bank of america": {
+            "authenticity_score": 90,
+            "common_variations": ["Bank of America", "BANK OF AMERICA", "BofA"],
+            "description": "Bank of America Corporation official logo",
+            "risk_factors": ["color variations", "font changes", "missing trademark symbol"]
+        },
+        # Legal firms
+        "latham": {
+            "authenticity_score": 85,
+            "common_variations": ["Latham & Watkins", "LATHAM & WATKINS", "Latham"],
+            "description": "Latham & Watkins LLP official logo",
+            "risk_factors": ["color variations", "font changes", "missing trademark symbol"]
+        },
+        "skadden": {
+            "authenticity_score": 85,
+            "common_variations": ["Skadden", "SKADDEN", "Skadden Arps"],
+            "description": "Skadden, Arps, Slate, Meagher & Flom LLP official logo",
+            "risk_factors": ["color variations", "font changes", "missing trademark symbol"]
+        },
+        # Government entities
+        "united states": {
+            "authenticity_score": 98,
+            "common_variations": ["United States", "UNITED STATES", "U.S.", "USA"],
+            "description": "United States Government official seal/logo",
+            "risk_factors": ["color variations", "missing official elements", "unauthorized use"]
+        },
+        "irs": {
+            "authenticity_score": 98,
+            "common_variations": ["IRS", "Internal Revenue Service", "INTERNAL REVENUE SERVICE"],
+            "description": "Internal Revenue Service official logo",
+            "risk_factors": ["color variations", "missing official elements", "unauthorized use"]
+        }
+    }
+
+
+def analyze_logo_authenticity(detected_logos: list[dict]) -> dict:
+    """
+    Analyze detected logos for authenticity based on the company database.
+    Returns authenticity analysis results.
+    """
+    logo_database = get_company_logo_database()
+    analysis_results = {
+        "total_logos_detected": len(detected_logos),
+        "authentic_logos": [],
+        "suspicious_logos": [],
+        "unknown_logos": [],
+        "overall_logo_authenticity_score": 0,
+        "logo_risk_factors": []
+    }
+    
+    if not detected_logos:
+        analysis_results["overall_logo_authenticity_score"] = 50  # Neutral score when no logos detected
+        return analysis_results
+    
+    total_score = 0
+    valid_logos = 0
+    
+    for logo in detected_logos:
+        logo_name = logo["description"].lower()
+        logo_score = logo["score"]
+        
+        # Find matching company in database
+        matched_company = None
+        for company_name, company_data in logo_database.items():
+            if any(variation.lower() in logo_name for variation in company_data["common_variations"]):
+                matched_company = (company_name, company_data)
+                break
+        
+        if matched_company:
+            company_name, company_data = matched_company
+            base_authenticity = company_data["authenticity_score"]
+            
+            # Adjust score based on detection confidence
+            adjusted_score = base_authenticity * logo_score
+            
+            logo_analysis = {
+                "logo_name": logo["description"],
+                "company": company_name,
+                "detection_confidence": logo_score,
+                "authenticity_score": adjusted_score,
+                "risk_factors": company_data["risk_factors"]
+            }
+            
+            if adjusted_score >= 80:
+                analysis_results["authentic_logos"].append(logo_analysis)
+            elif adjusted_score >= 60:
+                analysis_results["suspicious_logos"].append(logo_analysis)
+            else:
+                analysis_results["suspicious_logos"].append(logo_analysis)
+            
+            total_score += adjusted_score
+            valid_logos += 1
+        else:
+            # Unknown logo - could be legitimate or fake
+            unknown_analysis = {
+                "logo_name": logo["description"],
+                "company": "Unknown",
+                "detection_confidence": logo_score,
+                "authenticity_score": 50,  # Neutral score for unknown logos
+                "risk_factors": ["Unknown company", "Potential fake logo", "Unverified source"]
+            }
+            analysis_results["unknown_logos"].append(unknown_analysis)
+            total_score += 50
+            valid_logos += 1
+    
+    # Calculate overall score
+    if valid_logos > 0:
+        analysis_results["overall_logo_authenticity_score"] = int(total_score / valid_logos)
+    else:
+        analysis_results["overall_logo_authenticity_score"] = 50
+    
+    # Compile risk factors
+    all_risk_factors = []
+    for logo_list in [analysis_results["authentic_logos"], analysis_results["suspicious_logos"], analysis_results["unknown_logos"]]:
+        for logo in logo_list:
+            all_risk_factors.extend(logo["risk_factors"])
+    
+    analysis_results["logo_risk_factors"] = list(set(all_risk_factors))  # Remove duplicates
+    
+    return analysis_results
+
+
+def check_document_logos(file_content: bytes, mime_type: str) -> dict:
+    """
+    Check for logos in a document and analyze their authenticity.
+    Returns comprehensive logo analysis results.
+    """
+    try:
+        if mime_type == 'application/pdf':
+            # Extract images from PDF
+            images = extract_images_from_pdf(file_content)
+        else:
+            # For other file types, treat the entire file as an image
+            images = [file_content]
+        
+        all_detected_logos = []
+        
+        # Process each image for logo detection
+        for image_bytes in images:
+            detected_logos = detect_logos_in_image(image_bytes)
+            all_detected_logos.extend(detected_logos)
+        
+        # Analyze logo authenticity
+        logo_analysis = analyze_logo_authenticity(all_detected_logos)
+        
+        return {
+            "success": True,
+            "images_processed": len(images),
+            "logo_analysis": logo_analysis
+        }
+        
+    except Exception as e:
+        print(f"Error checking document logos: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "logo_analysis": {
+                "total_logos_detected": 0,
+                "authentic_logos": [],
+                "suspicious_logos": [],
+                "unknown_logos": [],
+                "overall_logo_authenticity_score": 50,
+                "logo_risk_factors": []
+            }
+        }
+
 
 if __name__ == "__main__":
     sample_legal_text = """
