@@ -1316,3 +1316,62 @@ textarea.upload-area {
 .verdict-PAGE_LIMIT_EXCEEDED {
     background-color: #ef4444; /* Red */
 }
+
+/* Logo Analysis Styles */
+.logo-analysis-section {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: rgba(77, 171, 247, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid #4dabf7;
+}
+
+.logo-analysis-title {
+    font-weight: 600;
+    color: #4dabf7;
+    margin-bottom: 0.5rem;
+}
+
+.logo-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.25rem 0;
+    padding: 0.25rem 0;
+}
+
+.logo-status-icon {
+    font-size: 1.2rem;
+}
+
+.logo-name {
+    font-weight: 500;
+}
+
+.logo-company {
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.logo-risk-factors {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #fbbf24;
+}
+
+.logo-analysis-stats {
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+}
+
+.logo-category {
+    margin: 0.75rem 0;
+}
+
+.logo-category h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: #e2e8f0;
+}
