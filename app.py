@@ -19,7 +19,8 @@ from legal_analyzer import (
     is_legal_document,  # pyright: ignore[reportUnusedImport]
     check_document_authenticity,
     check_page_limit,
-    check_document_logos
+    check_document_logos,
+    check_document_blur
 )
 
 # --- NEW, MORE ROBUST CREDENTIALS LOGIC ---
@@ -207,9 +208,15 @@ def export_pdf():
 @app.route("/check-authenticity", methods=["POST"])
 def check_authenticity():
     """
-    A new endpoint that only performs the authenticity check.
+    A multi-stage pre-check endpoint.
+    1. Checks Page Limit
+    2. NEW: Checks for Blurriness
+    3. Checks Authenticity
     """
     text_to_analyze = ""
+    file_content = None
+    mime_type = None
+    
     uploaded_file = request.files.get('pdf_file')
     pasted_text = request.form.get("legal_text", "")
 
@@ -218,7 +225,7 @@ def check_authenticity():
             file_content = uploaded_file.read()
             mime_type = uploaded_file.mimetype
             
-            # Check page limit first
+            # --- CHECK 1: PAGE LIMIT (Existing) ---
             page_limit_result = check_page_limit(file_content, mime_type)
             if page_limit_result['exceeds_limit']:
                 return jsonify({
@@ -228,29 +235,38 @@ def check_authenticity():
                     "page_details": page_limit_result
                 })
             
+            # --- NEW CHECK 2: BLUR ---
+            # Run the blur check on the raw file content
+            blur_check = check_document_blur(file_content, mime_type)
+            if blur_check["is_blurry"]:
+                return jsonify({
+                    "verdict": "BLURRY",
+                    "summary": blur_check["summary"],
+                    "confidence_score": 100, # Use 100 as a strong signal
+                    "blur_details": blur_check
+                })
+            
+            # --- IF CHECKS PASS, GET TEXT FOR AUTHENTICITY ---
             text_to_analyze = process_document_with_docai(file_content, mime_type)
+        
         elif pasted_text:
             text_to_analyze = pasted_text
 
+        # --- CHECK 3: AUTHENTICITY (Existing) ---
         if text_to_analyze:
-            # Pass file content and mime type for logo analysis
-            file_content_for_analysis = None
-            mime_type_for_analysis = None
-            
-            if uploaded_file and uploaded_file.filename != '':
-                file_content_for_analysis = file_content
-                mime_type_for_analysis = mime_type
+            # Pass file content for logo analysis
+            file_content_for_analysis = file_content if (uploaded_file and uploaded_file.filename != '') else None
+            mime_type_for_analysis = mime_type if (uploaded_file and uploaded_file.filename != '') else None
             
             report = check_document_authenticity(text_to_analyze, file_content_for_analysis, mime_type_for_analysis)
             return jsonify(report)
         else:
-            # If no text, return a generic "safe" report to avoid blocking the user
+            # No text, return a generic "safe" report
             return jsonify({ "confidence_score": 100, "summary": "No text provided.", "findings": [] })
 
     except Exception as e:
         print(f"Error in authenticity check endpoint: {e}")
         return jsonify({"error": "Failed to process document for authenticity check."}), 500
-
 
 @app.route("/check-logos", methods=["POST"])
 def check_logos():

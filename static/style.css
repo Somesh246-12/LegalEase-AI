@@ -897,6 +897,16 @@ textarea.upload-area {
     align-self: flex-end;
 }
 
+
+/* --- NEW: Add this to your chat styles --- */
+
+.chat-message.bot-typing {
+    background-color: var(--border-color);
+    color: var(--text-primary);
+    align-self: flex-start;
+    font-style: italic;
+    opacity: 0.7;
+}
 .chat-message.bot {
     background-color: var(--border-color);
     color: var(--text-primary);
@@ -1374,4 +1384,23 @@ textarea.upload-area {
     margin: 0 0 0.5rem 0;
     font-size: 1rem;
     color: #e2e8f0;
+}
+
+
+/* style.css */
+
+/* --- Add this to your existing verdict styles --- */
+.verdict-BLURRY {
+    background-color: #f59e0b; /* A warning-orange color */
+    color: #ffffff;
+}
+
+.verdict-SUSPICIOUS {
+    background-color: #facc15; /* Yellow */
+}
+.verdict-REAL {
+    background-color: #34d399; /* Green */
+}
+.verdict-PAGE_LIMIT_EXCEEDED {
+    background-color: #ef4444; /* Red */
 }

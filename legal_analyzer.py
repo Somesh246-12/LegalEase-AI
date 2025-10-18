@@ -1,3 +1,7 @@
+import cv2
+import numpy as np
+import io
+from pdf2image import convert_from_bytes # For PDF page processing
 import os
 import vertexai
 from vertexai.generative_models import GenerativeModel
@@ -105,6 +109,79 @@ def check_page_limit(file_content: bytes, mime_type: str, max_pages: int = 15) -
             "message": "Unable to check page count, proceeding with analysis.",
             "recommendation": "Proceeding with analysis."
         }
+
+def check_image_blur(image_bytes: bytes) -> float:
+    """
+    Reads image bytes and returns the Laplacian variance.
+    A lower number means more blurry.
+    """
+    try:
+        # 1. Decode the image from bytes
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        # 2. Convert to grayscale for analysis
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # 3. Calculate the Laplacian variance
+        variance = cv2.Laplacian(gray, cv2.CV_64F).var()
+        return variance
+    except Exception as e:
+        print(f"Error checking image blur: {e}")
+        # Return a high number to avoid false positives on decode error
+        return 9999.0
+
+
+def check_document_blur(file_content: bytes, mime_type: str) -> dict:
+    """
+    Checks an uploaded file (PDF or image) for blurriness.
+    """
+    # You can tune this threshold. 300 is a good starting point.
+    # Lower = more tolerant. Higher = more strict.
+    LAPLACIAN_THRESHOLD = 300.0 
+    
+    result = {
+        "is_blurry": False,
+        "summary": "",
+        "blurry_pages": []
+    }
+
+    try:
+        if mime_type == 'application/pdf':
+            # 1. Convert PDF to a list of images (one per page)
+            pages = convert_from_bytes(file_content, dpi=200)
+            
+            for i, page in enumerate(pages, 1):
+                # 2. Convert PIL Image to bytes
+                img_byte_arr = io.BytesIO()
+                page.save(img_byte_arr, format='PNG')
+                image_bytes = img_byte_arr.getvalue()
+                
+                # 3. Check blur on this page
+                variance = check_image_blur(image_bytes)
+                
+                if variance < LAPLACIAN_THRESHOLD:
+                    result["is_blurry"] = True
+                    result["blurry_pages"].append(i)
+            
+            if result["is_blurry"]:
+                page_str = ', '.join(map(str, result['blurry_pages']))
+                result["summary"] = f"Document appears blurry on page(s): {page_str}. For best results, please upload a clearer version."
+
+        elif mime_type.startswith('image/'):
+            # 1. It's a single image, check it directly
+            variance = check_image_blur(file_content)
+            
+            if variance < LAPLACIAN_THRESHOLD:
+                result["is_blurry"] = True
+                result["summary"] = "The uploaded image appears to be blurry. For best results, please upload a clearer version."
+
+    except Exception as e:
+        print(f"Error in blur detection: {e}")
+        # Fail safe: assume it's not blurry
+        result["is_blurry"] = False 
+
+    return result
 
 
 def analyze_risks(text: str, target_language: str = "English") -> list[dict]:

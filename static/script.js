@@ -36,12 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. Prevent the form from submitting immediately
             event.preventDefault();
     
-            // 2. Show the main loader with authentication message
+            // 2. Show the main loader
             const loaderText = document.getElementById('loader-text');
-            loaderText.textContent = 'Authenticating your document...';
+            loaderText.textContent = 'Analyzing document integrity...'; // Updated text
             loader.style.display = 'flex';
     
-            // 3. Send the form data to our new authenticity endpoint
+            // 3. Send the form data to our authenticity endpoint
             try {
                 const formData = new FormData(uploadForm);
                 const response = await fetch('/check-authenticity', {
@@ -50,29 +50,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
     
                 if (!response.ok) {
-                    throw new Error('Server error during authenticity check.');
+                    throw new Error('Server error during pre-check.');
                 }
     
                 const report = await response.json();
     
-                // 4. Hide the loader and show the modal with the results
+                // 4. Hide the loader and show the correct modal
                 loader.style.display = 'none';
                 
-                // Check if the document exceeds page limit
                 if (report.verdict === 'PAGE_LIMIT_EXCEEDED') {
                     displayPageLimitModal(report);
-                } else {
+                } 
+                // --- NEW: Handle BLURRY verdict ---
+                else if (report.verdict === 'BLURRY') {
+                    displayBlurryModal(report);
+                } 
+                // --- END NEW ---
+                else {
+                    // All checks passed, show normal authenticity modal
                     displayAuthenticityModal(report);
                 }
     
             } catch (error) {
-                console.error("Authenticity check failed:", error);
+                console.error("Pre-check failed:", error);
                 loader.style.display = 'none';
-                alert("Could not perform the authenticity check. Please try again.");
+                alert("Could not perform the document pre-check. Please try again.");
             }
         });
     }
-    
     // In your static/script.js file
 
 // In your static/script.js file
@@ -185,6 +190,69 @@ function displayAuthenticityModal(report) {
 
     const newCancelBtn = cancelBtn.cloneNode(true);
     cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    newCancelBtn.addEventListener('click', cancelHandler);
+}
+function displayBlurryModal(report) {
+    const modal = document.getElementById('authenticity-modal');
+    const verdictEl = document.getElementById('auth-verdict');
+    const summaryEl = document.getElementById('auth-summary');
+    
+    // Update modal title
+    const modalHeader = modal.querySelector('.modal-header h3');
+    if (modalHeader) {
+        modalHeader.textContent = '⚠️ Document is Blurry';
+    }
+    
+    // Populate the content
+    verdictEl.textContent = 'BLURRY';
+    verdictEl.className = 'auth-verdict verdict-BLURRY'; // Add new CSS class
+    
+    // Use the detailed summary from the backend
+    summaryEl.textContent = report.summary || "The uploaded document or image is too blurry. Please upload a clearer version.";
+
+    // Hide the logo analysis section, it's not relevant here
+    const logoAnalysisSection = document.getElementById('logo-analysis-section');
+    if (logoAnalysisSection) {
+        logoAnalysisSection.style.display = 'none';
+    }
+
+    // Show the modal
+    modal.style.display = 'flex';
+
+    // --- Button handler logic ---
+    // We want the buttons to allow for a re-upload
+    
+    const continueBtn = document.getElementById('auth-continue-btn');
+    const cancelBtn = document.getElementById('auth-cancel-btn');
+
+    const continueHandler = () => {
+        modal.style.display = 'none';
+        // Clear the file input to allow re-upload
+        const fileInput = document.getElementById('file-input');
+        if (fileInput) {
+            fileInput.value = ''; 
+        }
+        // Reset upload area text
+        const uploadBox = document.getElementById('upload-box');
+        if (uploadBox) {
+            uploadBox.querySelector('h3').textContent = 'Drag & Drop Your File Here';
+            uploadBox.querySelector('p').textContent = 'or click to select a file (PDF, TXT, JPG, PNG)';
+        }
+    };
+
+    const cancelHandler = () => {
+        modal.style.display = 'none';
+    };
+    
+    // Re-bind events to prevent old listeners from stacking
+    const newContinueBtn = continueBtn.cloneNode(true);
+    continueBtn.parentNode.replaceChild(newContinueBtn, continueBtn);
+    newContinueBtn.textContent = 'Upload New Document'; // Change button text
+    newContinueBtn.addEventListener('click', continueHandler);
+
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    newCancelBtn.textContent = 'Cancel';
     newCancelBtn.addEventListener('click', cancelHandler);
 }
 
