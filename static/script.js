@@ -84,7 +84,68 @@ function displayAuthenticityModal(report) {
     
     // --- Populate the content ---
     verdictEl.textContent = report.verdict;
+    
+    // Set basic summary
     summaryEl.textContent = report.summary;
+    
+    // Handle logo analysis display
+    const logoAnalysisSection = document.getElementById('logo-analysis-section');
+    const logoAnalysisContent = document.getElementById('logo-analysis-content');
+    
+    if (report.logo_analysis && report.logo_analysis.total_logos_detected > 0) {
+        const logoAnalysis = report.logo_analysis;
+        
+        let logoHtml = `<div class="logo-analysis-stats">
+            <p><strong>Total logos detected:</strong> ${logoAnalysis.total_logos_detected}</p>
+            <p><strong>Logo authenticity score:</strong> ${logoAnalysis.overall_logo_authenticity_score}/100</p>
+        </div>`;
+        
+        if (logoAnalysis.authentic_logos.length > 0) {
+            logoHtml += '<div class="logo-category"><h4>✅ Authentic Logos</h4>';
+            logoAnalysis.authentic_logos.forEach(logo => {
+                logoHtml += `<div class="logo-item">
+                    <span class="logo-status-icon">✅</span>
+                    <span class="logo-name">${logo.logo_name}</span>
+                    <span class="logo-company">(${logo.company})</span>
+                </div>`;
+            });
+            logoHtml += '</div>';
+        }
+        
+        if (logoAnalysis.suspicious_logos.length > 0) {
+            logoHtml += '<div class="logo-category"><h4>⚠️ Suspicious Logos</h4>';
+            logoAnalysis.suspicious_logos.forEach(logo => {
+                logoHtml += `<div class="logo-item">
+                    <span class="logo-status-icon">⚠️</span>
+                    <span class="logo-name">${logo.logo_name}</span>
+                    <span class="logo-company">(${logo.company})</span>
+                </div>`;
+            });
+            logoHtml += '</div>';
+        }
+        
+        if (logoAnalysis.unknown_logos.length > 0) {
+            logoHtml += '<div class="logo-category"><h4>❓ Unknown Logos</h4>';
+            logoAnalysis.unknown_logos.forEach(logo => {
+                logoHtml += `<div class="logo-item">
+                    <span class="logo-status-icon">❓</span>
+                    <span class="logo-name">${logo.logo_name}</span>
+                </div>`;
+            });
+            logoHtml += '</div>';
+        }
+        
+        if (logoAnalysis.logo_risk_factors.length > 0) {
+            logoHtml += `<div class="logo-risk-factors">
+                <strong>Risk factors:</strong> ${logoAnalysis.logo_risk_factors.join(', ')}
+            </div>`;
+        }
+        
+        logoAnalysisContent.innerHTML = logoHtml;
+        logoAnalysisSection.style.display = 'block';
+    } else {
+        logoAnalysisSection.style.display = 'none';
+    }
 
     // --- NEW: Add a class for CSS highlighting ---
     // First, remove any classes from a previous analysis
